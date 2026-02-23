@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Search, ShoppingBag, Shield, User, LogOut } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Search, ShoppingBag, User, LogOut } from 'lucide-react';
 
 const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     setIsLoggedIn(!!localStorage.getItem('accessToken'));
-  }, []);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
@@ -21,7 +22,7 @@ const Header = () => {
     <header className="sticky top-0 z-50 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-[#E5E0D8]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         <div className="flex items-center gap-10">
-          <Link to="/" className="flex flex-col items-center cursor-pointer">
+          <Link to="/" className="flex flex-col items-center cursor-pointer group">
             <h1 className="text-xl font-serif font-bold tracking-widest text-[#2C2C2C]">ONEPICK LUX</h1>
             <div className="flex items-center gap-2 w-full justify-center">
               <div className="h-[1px] w-3 bg-[#997B4D]"></div>
@@ -32,6 +33,7 @@ const Header = () => {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#5C5550]">
             <Link to="/products" className="hover:text-[#997B4D] transition">NEW</Link>
             <Link to="/products" className="hover:text-[#997B4D] transition">BEST</Link>
+            <Link to="/products" className="hover:text-[#997B4D] transition flex items-center gap-1">SALE <span className="text-[#997B4D] text-[10px]">●</span></Link>
           </nav>
         </div>
         <div className="flex items-center gap-5 text-[#5C5550]">
@@ -43,10 +45,21 @@ const Header = () => {
             <ShoppingBag size={20} strokeWidth={1.5} />
             <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#997B4D] text-white text-[9px] flex items-center justify-center rounded-full">2</span>
           </button>
+
+          {/* 로그인 상태에 따라 버튼 분기 */}
           {isLoggedIn ? (
-            <button onClick={handleLogout} className="flex items-center gap-2 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase"><LogOut size={16} /> LOGOUT</button>
+            <div className="flex items-center gap-4 ml-2 border-l border-[#E5E0D8] pl-4">
+              <button onClick={() => navigate('/mypage')} className="flex items-center gap-1.5 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase">
+                <User size={16} /> MY PAGE
+              </button>
+              <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase">
+                <LogOut size={16} /> LOGOUT
+              </button>
+            </div>
           ) : (
-            <button onClick={() => navigate('/login')} className="flex items-center gap-2 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase"><User size={16} /> LOGIN</button>
+            <button onClick={() => navigate('/login')} className="flex items-center gap-2 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase">
+              <User size={16} /> LOGIN
+            </button>
           )}
         </div>
       </div>

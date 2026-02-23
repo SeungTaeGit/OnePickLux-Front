@@ -9,6 +9,8 @@ import ProductDetailPage from './pages/ProductDetailPage.jsx';
 import SellingPage from './pages/SellingPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
+import MyPage from './pages/MyPage.jsx';
+import AdminPage from './pages/AdminPage';
 
 const App = () => {
   return (
@@ -24,6 +26,8 @@ const App = () => {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/mypage" element={<MyPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </main>
         <Footer />

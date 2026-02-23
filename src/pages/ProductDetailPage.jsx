@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingBag, Shield, CheckCircle, Share2 } from 'lucide-react';
+import { ShoppingBag, Shield, CheckCircle, Share2, TrendingDown } from 'lucide-react';
 import { getProductDetail } from '../api/productApi.js';
 
 const ProductDetailPage = () => {
@@ -31,6 +31,12 @@ const ProductDetailPage = () => {
   if (loading) return <div className="py-20 text-center text-[#888]">Loading detail...</div>;
   if (!detail) return <div className="py-20 text-center text-[#888]">상품 정보를 찾을 수 없습니다.</div>;
 
+  // 💡 [추가] 할인율 및 최종 할인가 계산
+  const discountRate = detail.discountRate || detail.discount || 0;
+  const finalPrice = discountRate > 0
+    ? Math.floor(detail.price * (1 - discountRate / 100))
+    : detail.price;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fade-in">
       <div className="text-xs text-[#888] mb-8 font-medium">Home &gt; {detail.categoryName || 'Category'} &gt; {detail.brandName} &gt; <span className="text-[#2C2C2C]">{detail.name}</span></div>
@@ -47,8 +53,28 @@ const ProductDetailPage = () => {
         <div className="flex flex-col justify-center">
           <div className="mb-2"><span className="text-[#997B4D] font-bold text-sm tracking-widest uppercase border-b border-[#997B4D] pb-0.5">{detail.brandName}</span></div>
           <h1 className="text-3xl md:text-4xl font-serif text-[#2C2C2C] mb-6 leading-tight">{detail.name}</h1>
+
+          {/* 💡 [수정] 할인가가 적용된 UI 영역 */}
           <div className="flex items-center gap-4 mb-8">
-            <span className="text-3xl font-serif text-[#2C2C2C]">{detail.price?.toLocaleString()}<span className="text-lg">원</span></span>
+            {discountRate > 0 ? (
+              <div className="flex flex-col">
+                <span className="text-lg text-[#999] line-through decoration-1 mb-1 font-serif">
+                  {detail.price?.toLocaleString()}원
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl font-serif text-red-500 font-bold">
+                    {finalPrice.toLocaleString()}<span className="text-2xl text-red-500 ml-1">원</span>
+                  </span>
+                  <span className="bg-red-50 text-red-500 border border-red-200 text-xs font-bold px-2 py-1 tracking-wider flex items-center gap-1">
+                    <TrendingDown size={12}/> -{discountRate}%
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <span className="text-3xl font-serif text-[#2C2C2C]">
+                {detail.price?.toLocaleString()}<span className="text-lg ml-1">원</span>
+              </span>
+            )}
           </div>
 
           <div className="h-[1px] bg-[#E5E0D8] w-full mb-8"></div>
