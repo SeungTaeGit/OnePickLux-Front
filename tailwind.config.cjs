@@ -5,7 +5,12 @@ module.exports = {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Pretendard', 'sans-serif'],
+        serif: ['Playfair Display', 'Noto Serif KR', 'serif'],
+      },
+    },
   },
   plugins: [],
 }
