@@ -6,17 +6,52 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // [추가] 장바구니 개수를 담을 상태 변수 (기본값 0)
+  const [cartCount, setCartCount] = useState(0);
 
   const [activeTab, setActiveTab] = useState('category');
   const [likedCategories, setLikedCategories] = useState([]);
   const [likedBrands, setLikedBrands] = useState([]);
 
+  // 1. 컴포넌트가 화면에 나타날 때(또는 경로가 바뀔 때) 실행
   useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem('accessToken'));
+    const token = localStorage.getItem('accessToken');
+    const loggedIn = !!token;
+    setIsLoggedIn(loggedIn);
     setIsMenuOpen(false);
+
+    // [추가] 2. 로그인 상태라면 백엔드에서 장바구니 개수를 가져옵니다.
+    if (loggedIn) {
+      fetchCartCount(token);
+    } else {
+      setCartCount(0); // 로그아웃 상태면 0으로 초기화
+    }
   }, [location.pathname]);
+
+  // [추가] 3. 백엔드 API 호출 함수
+  const fetchCartCount = async (token) => {
+    try {
+      // 본인의 백엔드 서버 주소에 맞게 수정하세요 (예: http://localhost:8080/api/cart/count)
+      const response = await fetch('http://localhost:8080/api/cart/count', {
+        method: 'GET',
+        headers: {
+          // 백엔드(Spring Security)가 사용자를 인식할 수 있도록 토큰을 보냅니다.
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // ApiResponse 구조에 맞게 데이터를 꺼내옵니다. (result.data)
+        setCartCount(result.data);
+      }
+    } catch (error) {
+      console.error('장바구니 개수를 가져오는데 실패했습니다:', error);
+    }
+  };
 
   useEffect(() => {
     if (isMenuOpen) {
@@ -30,12 +65,24 @@ const Header = () => {
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     setIsLoggedIn(false);
+    setCartCount(0); // 로그아웃 시 장바구니 개수 초기화
     alert('로그아웃 되었습니다.');
     navigate('/');
   };
 
   const categories = ['가방', '시계', '주얼리', '지갑', '의류', '신발'];
-  const brands = ['CHANEL', 'HERMES', 'ROLEX', 'LOUIS VUITTON', 'GUCCI', 'DIOR', 'PRADA', 'CELINE', 'CARTIER', 'GOYARD'];
+  const brands = [
+    { eng: 'CHANEL', kor: '샤넬' },
+    { eng: 'HERMES', kor: '에르메스' },
+    { eng: 'ROLEX', kor: '롤렉스' },
+    { eng: 'LOUIS VUITTON', kor: '루이비통' },
+    { eng: 'GUCCI', kor: '구찌' },
+    { eng: 'DIOR', kor: '디올' },
+    { eng: 'PRADA', kor: '프라다' },
+    { eng: 'CELINE', kor: '셀린느' },
+    { eng: 'CARTIER', kor: '까르띠에' },
+    { eng: 'GOYARD', kor: '고야드' }
+  ];
 
   const toggleLikeCategory = (category) => {
     setLikedCategories(prev =>
@@ -43,17 +90,17 @@ const Header = () => {
     );
   };
 
-  const toggleLikeBrand = (brand) => {
+  const toggleLikeBrand = (brandEngName) => {
     setLikedBrands(prev =>
-      prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
+      prev.includes(brandEngName) ? prev.filter(b => b !== brandEngName) : [...prev, brandEngName]
     );
   };
 
   const unlikedCategories = categories.filter(c => !likedCategories.includes(c));
-  const unlikedBrands = brands.filter(b => !likedBrands.includes(b));
+  const likedBrandsList = brands.filter(b => likedBrands.includes(b.eng));
+  const unlikedBrandsList = brands.filter(b => !likedBrands.includes(b.eng));
 
   return (
-    // font-sans를 적용하여 전체 기본 폰트를 Pretendard로 설정합니다.
     <header className="sticky top-0 z-50 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-[#E5E0D8] relative font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative z-10 bg-[#FDFBF7]/95">
 
@@ -66,7 +113,6 @@ const Header = () => {
           </button>
 
           <Link to="/" className="flex flex-col items-center cursor-pointer group">
-            {/* 로고, 제목 등에 font-serif를 적용하여 Playfair/Noto Serif를 씁니다. */}
             <h1 className="text-xl font-serif font-bold tracking-widest text-[#2C2C2C]">ONEPICK LUX</h1>
             <div className="flex items-center gap-2 w-full justify-center">
               <div className="h-[1px] w-3 bg-[#997B4D]"></div>
@@ -89,9 +135,15 @@ const Header = () => {
             내 명품 팔기
           </button>
           <button className="hover:text-[#997B4D] transition"><Search size={20} strokeWidth={1.5} /></button>
-          <button className="hover:text-[#997B4D] transition relative">
+
+          {/* [수정] 장바구니 버튼 클릭 시 /cart 로 이동 & cartCount가 0보다 클 때만 숫자 배지를 보여줌 */}
+          <button onClick={() => navigate('/cart')} className="hover:text-[#997B4D] transition relative">
             <ShoppingBag size={20} strokeWidth={1.5} />
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#997B4D] text-white text-[9px] flex items-center justify-center rounded-full font-bold">2</span>
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#997B4D] text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">
+                {cartCount > 99 ? '99+' : cartCount}
+              </span>
+            )}
           </button>
 
           {isLoggedIn ? (
@@ -189,21 +241,22 @@ const Header = () => {
                 </div>
               ) : (
                 <div className="space-y-10">
-                  {likedBrands.length > 0 && (
+                  {likedBrandsList.length > 0 && (
                     <div>
                       <h3 className="text-base font-serif font-bold text-[#997B4D] mb-4 flex items-center gap-2">
                         <Heart size={18} className="fill-[#997B4D]" /> 관심 브랜드
                       </h3>
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        {likedBrands.map((brand, index) => (
+                      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {likedBrandsList.map((brand, index) => (
                           <div key={`liked-brand-${index}`} className="flex items-center justify-between p-3.5 bg-[#FDFBF7] border border-[#997B4D]/30 rounded-xl transition-all hover:shadow-md">
                             <button
-                              onClick={() => { setIsMenuOpen(false); navigate(`/products?brand=${brand}`); }}
-                              className="text-sm font-serif font-bold text-[#997B4D]"
+                              onClick={() => { setIsMenuOpen(false); navigate(`/products?brand=${brand.eng}`); }}
+                              className="text-left group-hover:text-[#997B4D] truncate pr-2"
                             >
-                              {brand}
+                              <span className="text-sm font-bold text-[#997B4D]">{brand.kor}</span>
+                              <span className="text-[11px] font-serif text-[#B5A591] ml-1.5 uppercase">({brand.eng})</span>
                             </button>
-                            <button onClick={() => toggleLikeBrand(brand)} className="p-1">
+                            <button onClick={() => toggleLikeBrand(brand.eng)} className="p-1 shrink-0">
                               <Heart size={18} className="fill-[#997B4D] text-[#997B4D]" />
                             </button>
                           </div>
@@ -216,16 +269,17 @@ const Header = () => {
                     <h3 className="text-base font-serif font-bold text-[#2C2C2C] mb-4">
                       전체 브랜드
                     </h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                      {unlikedBrands.map((brand, index) => (
-                        <div key={`brand-${index}`} className="flex items-center justify-between p-3.5 bg-gray-50/50 border border-transparent hover:border-[#E5E0D8] hover:bg-white rounded-xl transition-all">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {unlikedBrandsList.map((brand, index) => (
+                        <div key={`brand-${index}`} className="flex items-center justify-between p-3.5 bg-gray-50/50 border border-transparent hover:border-[#E5E0D8] hover:bg-white rounded-xl transition-all group">
                           <button
-                            onClick={() => { setIsMenuOpen(false); navigate(`/products?brand=${brand}`); }}
-                            className="text-sm font-serif font-medium text-[#5C5550] hover:text-[#2C2C2C]"
+                            onClick={() => { setIsMenuOpen(false); navigate(`/products?brand=${brand.eng}`); }}
+                            className="text-left truncate pr-2"
                           >
-                            {brand}
+                            <span className="text-sm font-medium text-[#2C2C2C] group-hover:text-[#997B4D] transition-colors">{brand.kor}</span>
+                            <span className="text-[11px] font-serif text-[#8C857E] ml-1.5 uppercase group-hover:text-[#B5A591] transition-colors">({brand.eng})</span>
                           </button>
-                          <button onClick={() => toggleLikeBrand(brand)} className="p-1">
+                          <button onClick={() => toggleLikeBrand(brand.eng)} className="p-1 shrink-0">
                             <Heart size={18} className="text-[#D1C9C0] hover:text-[#997B4D]" />
                           </button>
                         </div>

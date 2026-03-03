@@ -11,12 +11,16 @@ import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import MyPage from './pages/MyPage.jsx';
 import AdminPage from './pages/AdminPage';
+import CartPage from './pages/CartPage';
+import FloatingQuickMenu from './components/layout/FloatingQuickMenu';
+import BrandPage from './pages/BrandPage';
 
 const App = () => {
   return (
     <BrowserRouter>
       <div className="flex flex-col min-h-screen bg-[#FDFBF7] font-sans">
         <Header />
+        <FloatingQuickMenu />
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<MainPage />} />
@@ -28,6 +32,8 @@ const App = () => {
             <Route path="*" element={<Navigate to="/" replace />} />
             <Route path="/mypage" element={<MyPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/brand/:brandName" element={<BrandPage />} />
           </Routes>
         </main>
         <Footer />

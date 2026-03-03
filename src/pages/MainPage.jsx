@@ -3,14 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import BannerSection from '../components/home/BannerSection.jsx';
 import InfoSliderSection from '../components/home/InfoSliderSection.jsx';
 import ProductCard from '../components/common/ProductCard.jsx';
-import { CATEGORIES, INITIAL_BRANDS, MOCK_PRODUCTS } from '../constants/data.js';
+import { MOCK_PRODUCTS } from '../constants/data.js';
 import { getProducts } from '../api/productApi.js';
 
 const MainPage = () => {
   const navigate = useNavigate();
   const [realProducts, setRealProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const topBrands = INITIAL_BRANDS.slice(0, 5);
 
   useEffect(() => {
     const fetchMainData = async () => {
@@ -29,35 +28,43 @@ const MainPage = () => {
     fetchMainData();
   }, []);
 
+  // 💡 메인에 장식할 대표 브랜드 목록
+  const topBrands = [
+    { name: 'CHANEL', url: 'chanel' },
+    { name: 'HERMÈS', url: 'hermes' },
+    { name: 'ROLEX', url: 'rolex' },
+    { name: 'LOUIS VUITTON', url: 'louis-vuitton' },
+    { name: 'DIOR', url: 'dior' }
+  ];
+
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in font-sans">
+      {/* 최상단 배너 섹션 */}
       <BannerSection />
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
-        <div>
-          <div className="text-center mb-8">
-            <span className="text-[#997B4D] text-xs font-bold tracking-[0.2em] uppercase mb-2 block">Collections</span>
-            <h2 className="text-2xl font-serif text-[#2C2C2C]">Browse by Category</h2>
+      {/* 💡 [신규 추가] 프리미어 브랜드관 섹션 (럭셔리한 다크 테마) */}
+      <section className="bg-[#1A1A1A] text-white py-20 border-b-4 border-[#D4AF37]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="text-[#D4AF37] text-[10px] font-black tracking-[0.3em] uppercase mb-3 block">Premium Boutiques</span>
+            <h2 className="text-3xl md:text-4xl font-serif tracking-widest">프리미어 브랜드관</h2>
+            <div className="w-12 h-[1px] bg-white/20 mx-auto mt-6"></div>
           </div>
-          <div className="flex justify-center gap-6 overflow-x-auto pb-4 scrollbar-hide">
-            {CATEGORIES.map((cat) => (
-              <div onClick={() => navigate('/products')} key={cat.id} className="flex flex-col items-center gap-3 min-w-[80px] cursor-pointer group">
-                <div className="w-20 h-20 bg-white rounded-full shadow-sm border border-[#E5E0D8] flex items-center justify-center text-3xl group-hover:border-[#997B4D] group-hover:bg-[#997B4D]/5 transition duration-300">
-                  {cat.icon}
-                </div>
-                <span className="text-xs font-medium text-[#5C5550] group-hover:text-[#997B4D] transition">{cat.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        <div>
-           <div className="flex items-center justify-center gap-4 flex-wrap">
-            {topBrands.map((brand, index) => (
-              <button onClick={() => navigate('/products')} key={brand.id} className="relative px-6 py-2 bg-white border border-[#E5E0D8] text-xs font-serif text-[#5C5550] hover:border-[#997B4D] hover:text-[#997B4D] transition shadow-sm uppercase tracking-wide min-w-[120px]">
-                {index < 3 && <span className="absolute -top-1 -right-1 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D4AF37] opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-[#D4AF37]"></span></span>}
-                {brand.name}
-              </button>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {topBrands.map((brand) => (
+              <div
+                key={brand.url}
+                onClick={() => navigate(`/brand/${brand.url}`)}
+                className="group relative aspect-[4/3] bg-[#2C2C2C] flex items-center justify-center cursor-pointer overflow-hidden border border-white/5 hover:border-[#D4AF37]/50 transition-colors"
+              >
+                {/* 호버 시 나타나는 골드 빛 배경 효과 */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#D4AF37]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                <span className="font-serif text-lg tracking-widest text-white/70 group-hover:text-[#D4AF37] group-hover:scale-110 transition-all duration-500 relative z-10">
+                  {brand.name}
+                </span>
+              </div>
             ))}
           </div>
         </div>
@@ -66,9 +73,9 @@ const MainPage = () => {
       <section className="bg-gradient-to-b from-[#FDFBF7] via-white to-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-20">
-            <div className="flex flex-col items-center mb-10">
-              <span className="text-[#997B4D] text-xs font-bold tracking-[0.2em] mb-2">CURATED FOR YOU</span>
-              <h2 className="text-3xl font-serif text-[#2C2C2C]">Trending Now</h2>
+            <div className="flex flex-col items-center mb-10 mt-6">
+              <span className="text-[#997B4D] text-xs font-bold tracking-[0.2em] mb-2 uppercase">MD's Pick</span>
+              <h2 className="text-3xl font-serif text-[#2C2C2C]">지금 뜨는 베스트 상품</h2>
               <div className="w-10 h-[1px] bg-[#997B4D] mt-4"></div>
             </div>
 
@@ -95,7 +102,7 @@ const MainPage = () => {
 
             <div className="mt-16 text-center">
               <button onClick={() => navigate('/products')} className="px-10 py-3 border border-[#D1C7BD] text-xs font-bold tracking-widest text-[#5C5550] hover:bg-[#2C2C2C] hover:text-white hover:border-[#2C2C2C] transition uppercase">
-                View All Products
+                전체 상품 보기
               </button>
             </div>
           </div>
@@ -103,10 +110,10 @@ const MainPage = () => {
           <div className="mb-20 bg-[#2C2C2C] rounded-sm p-10 md:p-14 text-white relative overflow-hidden shadow-2xl">
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
               <div className="text-center md:text-left max-w-lg">
-                <span className="inline-block px-3 py-1 border border-[#D4AF37] text-[#D4AF37] text-[10px] font-bold tracking-widest mb-4">LIMITED OFFER</span>
-                <h3 className="text-3xl md:text-4xl font-serif mb-4 leading-tight">Vintage <span className="text-[#D4AF37] italic">Special</span> Deal</h3>
+                <span className="inline-block px-3 py-1 border border-[#D4AF37] text-[#D4AF37] text-[10px] font-bold tracking-widest mb-4">기간 한정 특가</span>
+                <h3 className="text-3xl md:text-4xl font-serif mb-4 leading-tight">빈티지 <span className="text-[#D4AF37] italic">스페셜</span> 딜</h3>
                 <p className="text-gray-400 mb-8 font-light leading-relaxed">매일 오후 2시, 검수팀이 엄선한 S급 빈티지 상품을<br/>놀라운 가격에 만나보세요.</p>
-                <button onClick={() => navigate('/products')} className="px-8 py-3 bg-[#D4AF37] text-white text-sm font-bold tracking-widest hover:bg-[#B89628] transition shadow-lg">VIEW ALL DEALS</button>
+                <button onClick={() => navigate('/products')} className="px-8 py-3 bg-[#D4AF37] text-white text-sm font-bold tracking-widest hover:bg-[#B89628] transition shadow-lg">특가 상품 모두 보기</button>
               </div>
               <div className="flex gap-4">
                 {MOCK_PRODUCTS.slice(4, 6).map((product) => (

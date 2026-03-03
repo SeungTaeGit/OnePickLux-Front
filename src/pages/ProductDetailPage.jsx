@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Shield, CheckCircle, Share2, TrendingDown, Heart } from 'lucide-react';
 import { getProductDetail } from '../api/productApi.js';
 import axios from 'axios';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate(); // 페이지 이동을 위해 추가
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // 💡 [버그 픽스] 이 상태 변수가 누락되어서 하얀 화면 에러가 발생했던 것입니다!
   const [isLiked, setIsLiked] = useState(false);
 
   useEffect(() => {
@@ -20,8 +19,6 @@ const ProductDetailPage = () => {
         const response = await getProductDetail(id);
         if (response && response.status === 'OK' && response.data) {
           setDetail(response.data);
-
-          // 💡 화면 켜질 때 백엔드가 준 isLiked 값으로 하트 초기화!
           if (response.data.isLiked !== undefined) {
              setIsLiked(response.data.isLiked);
           }
@@ -37,11 +34,11 @@ const ProductDetailPage = () => {
     fetchDetail();
   }, [id]);
 
-  // 💡 [수정] 찜 토글 함수
   const handleLikeToggle = async () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
       alert('로그인이 필요한 서비스입니다.');
+      navigate('/login');
       return;
     }
 
@@ -58,6 +55,55 @@ const ProductDetailPage = () => {
     } catch (error) {
       console.error('찜하기 오류:', error);
       alert('처리 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 💡 [핵심 추가] 장바구니 담기 함수
+  const handleAddToCart = async () => {
+    const token = localStorage.getItem('accessToken');
+
+    // 1. 비로그인 상태면 로그인 페이지로 유도
+    if (!token) {
+      alert('장바구니 기능은 로그인이 필요합니다.');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      // 2. 백엔드 API 호출 (단일 상품이므로 count는 무조건 1로 고정)
+      const response = await axios.post('http://localhost:8080/api/cart',
+        {
+          productId: parseInt(id),
+          count: 1
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // 3. 성공 시 처리
+      if (response.data.status === 'OK' || response.status === 200) {
+        // 사용자에게 장바구니로 바로 이동할지 묻습니다.
+        if (window.confirm('장바구니에 상품이 담겼습니다. 장바구니로 이동하시겠습니까?')) {
+          navigate('/cart');
+        } else {
+          // 이동하지 않고 현재 페이지에 남을 경우, 헤더의 장바구니 숫자를 갱신하기 위해 새로고침(또는 상태 업데이트)
+          window.location.reload();
+        }
+      }
+    } catch (error) {
+      // 4. 실패 시 처리 (특히 백엔드에서 던진 "이미 담긴 상품입니다" 예외 처리)
+      console.error('장바구니 담기 오류:', error);
+
+      // 백엔드의 GlobalExceptionHandler가 에러 메시지를 response.data.message 등에 담아준다고 가정
+      if (error.response && error.response.data && error.response.data.message) {
+        alert(error.response.data.message);
+      } else {
+        alert('이미 장바구니에 담긴 상품이거나 처리 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -123,10 +169,13 @@ const ProductDetailPage = () => {
               onClick={handleLikeToggle}
               className="w-14 flex items-center justify-center border border-[#E5E0D8] hover:border-[#2C2C2C] transition group bg-white"
             >
-              {/* 💡 [수정] isLiked 상태에 따라 색상 변경 */}
               <Heart size={20} className={`transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-[#2C2C2C] group-hover:text-red-500'}`} />
             </button>
-            <button className="flex-1 border border-[#E5E0D8] text-[#2C2C2C] py-4 font-bold text-sm tracking-widest hover:border-[#2C2C2C] transition flex items-center justify-center gap-2">
+            {/* 💡 [수정] ADD TO CART 버튼에 onClick 이벤트 연결 */}
+            <button
+              onClick={handleAddToCart}
+              className="flex-1 border border-[#E5E0D8] text-[#2C2C2C] py-4 font-bold text-sm tracking-widest hover:border-[#2C2C2C] transition flex items-center justify-center gap-2 bg-white hover:bg-gray-50"
+            >
               <ShoppingBag size={18} strokeWidth={1.5} /> ADD TO CART
             </button>
             <button className="flex-1 bg-[#2C2C2C] text-white py-4 font-bold text-sm tracking-widest hover:bg-[#444] transition shadow-lg">BUY NOW</button>
@@ -150,8 +199,7 @@ const ProductDetailPage = () => {
               <h3 className="text-xl font-serif text-[#2C2C2C] mb-4">Product Details</h3>
               <p className="text-sm text-[#5C5550] leading-loose">{detail.description || "전문 감정사가 엄격한 기준에 따라 검수를 완료한 100% 정품입니다."}</p>
             </div>
-
-            {/* ... 검수 리포트 부분 생략 없이 유지 ... */}
+            {/* 기존 검수 리포트 내용이 있다면 이 아래에 유지됩니다 */}
          </div>
       </div>
     </div>
