@@ -11,10 +11,8 @@ const Header = () => {
   const [cartCount, setCartCount] = useState(0);
   const [activeTab, setActiveTab] = useState('category');
 
-  // 드롭다운 내 검색창 상태
   const [brandSearch, setBrandSearch] = useState('');
 
-  // LocalStorage를 활용하여 새로고침해도 관심 목록 유지
   const [likedCategories, setLikedCategories] = useState(() => {
     const saved = localStorage.getItem('likedCategories');
     return saved ? JSON.parse(saved) : [];
@@ -25,7 +23,6 @@ const Header = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // 상태가 바뀔 때마다 LocalStorage 업데이트
   useEffect(() => {
     localStorage.setItem('likedCategories', JSON.stringify(likedCategories));
   }, [likedCategories]);
@@ -39,7 +36,7 @@ const Header = () => {
     const loggedIn = !!token;
     setIsLoggedIn(loggedIn);
     setIsMenuOpen(false);
-    setBrandSearch(''); // 메뉴 닫힐 때 검색어 초기화
+    setBrandSearch('');
 
     if (loggedIn) {
       fetchCartCount(token);
@@ -66,7 +63,6 @@ const Header = () => {
     }
   };
 
-  // Layout Shift(덜컹거림) 방지 로직
   useEffect(() => {
     if (isMenuOpen) {
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
@@ -108,7 +104,6 @@ const Header = () => {
     { eng: 'GOYARD', kor: '고야드', slug: 'goyard' }
   ];
 
-  // 인기 브랜드 (정적 데이터)
   const popularBrands = [
     brands.find(b => b.eng === 'CHANEL'),
     brands.find(b => b.eng === 'HERMES'),
@@ -131,7 +126,6 @@ const Header = () => {
   const likedCategoriesList = categories.filter(c => likedCategories.includes(c.id));
   const likedBrandsList = brands.filter(b => likedBrands.includes(b.slug));
 
-  // 검색어에 따른 브랜드 필터링
   const filteredBrands = brands.filter(b =>
     b.eng.toLowerCase().includes(brandSearch.toLowerCase()) ||
     b.kor.includes(brandSearch)
@@ -204,8 +198,11 @@ const Header = () => {
         </div>
       </div>
 
+      {/* 💡 [핵심 수정] 드롭다운 컨테이너에 스크롤바 숨김 Tailwind 클래스 추가
+          [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
+          이 클래스들이 화면에서 스크롤바 영역을 없애주어 밀림 현상을 방지합니다. */}
       <div
-        className={`fixed top-20 left-0 w-full h-[calc(100vh-5rem)] bg-white z-40 border-t border-[#E5E0D8] overflow-y-auto transform transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] origin-top
+        className={`fixed top-20 left-0 w-full h-[calc(100vh-5rem)] bg-white z-40 border-t border-[#E5E0D8] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transform transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] origin-top
           ${isMenuOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-4 pointer-events-none'}`}
       >
         <div className="max-w-7xl mx-auto h-full flex flex-col md:flex-row px-4 sm:px-6 lg:px-8">
@@ -317,7 +314,6 @@ const Header = () => {
               </div>
             )}
 
-            {/* 카테고리 탭 영역 (브랜드와 통일감 있게 디자인) */}
             {activeTab === 'category' && (
               <div className="animate-fade-in space-y-12">
                 <div className="flex flex-col xl:flex-row gap-6">
@@ -338,7 +334,7 @@ const Header = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex-1 hidden xl:block"></div> {/* 균형을 위한 빈 공간 */}
+                  <div className="flex-1 hidden xl:block"></div>
                 </div>
 
                 <div>
