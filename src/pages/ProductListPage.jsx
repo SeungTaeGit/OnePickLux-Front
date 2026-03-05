@@ -1,30 +1,89 @@
 import React, { useState, useEffect } from 'react';
-import { Filter, SlidersHorizontal, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Filter, SlidersHorizontal, ChevronDown, ChevronRight, Search, Tag, Sparkles, Flame } from 'lucide-react';
 import ProductCard from '../components/common/ProductCard.jsx';
 import { CATEGORIES, INITIAL_BRANDS } from '../constants/data.js';
 import { getProducts } from '../api/productApi.js';
 
 const ProductListPage = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const queryParams = new URLSearchParams(location.search);
+  const urlSort = queryParams.get('sort');
+  const urlFilter = queryParams.get('filter');
+  const urlCategoryId = queryParams.get('categoryId');
+  // 💡 URL에서 brandId 추출
+  const urlBrandId = queryParams.get('brandId');
+
+  let initialTab = 'new';
+  if (urlFilter === 'sale') initialTab = 'sale';
+  else if (urlSort === 'best') initialTab = 'best';
+
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [filterPrice, setFilterPrice] = useState(10000000);
   const [keyword, setKeyword] = useState('');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // API 호출 함수: 검색어(keyword)와 최대 가격(maxPrice)을 파라미터로 전송
+  const [selectedCategory, setSelectedCategory] = useState(urlCategoryId ? Number(urlCategoryId) : 'all');
+  // 💡 선택된 브랜드를 상태로 관리
+  const [selectedBrand, setSelectedBrand] = useState(urlBrandId ? Number(urlBrandId) : 'all');
+
+  useEffect(() => {
+    let tab = 'new';
+    const currentParams = new URLSearchParams(location.search);
+    if (currentParams.get('filter') === 'sale') tab = 'sale';
+    else if (currentParams.get('sort') === 'best') tab = 'best';
+
+    // URL이 바뀔 때 상태 동기화
+    const categoryId = currentParams.get('categoryId');
+    setSelectedCategory(categoryId ? Number(categoryId) : 'all');
+
+    const brandId = currentParams.get('brandId');
+    setSelectedBrand(brandId ? Number(brandId) : 'all');
+
+    setActiveTab(tab);
+  }, [location.search]);
+
+  // 💡 [핵심] 기존 URL 파라미터를 유지하면서 필터를 추가/제거하는 함수
+  const handleFilterChange = (key, value) => {
+    const params = new URLSearchParams(location.search);
+    if (value === 'all') {
+      params.delete(key); // 전체보기를 누르면 해당 파라미터 삭제
+    } else {
+      params.set(key, value); // 새로운 파라미터 덮어쓰기/추가
+    }
+    params.delete('page'); // 필터가 바뀌면 1페이지로 초기화해야 함
+    navigate(`/products?${params.toString()}`);
+  };
+
   const fetchProducts = async () => {
     try {
       setLoading(true);
       const params = {
         page: 0,
         size: 20,
-        sort: 'createdAt,desc',
         keyword: keyword || undefined,
         maxPrice: filterPrice || undefined
       };
 
+      if (activeTab === 'new') params.sort = 'new';
+      else if (activeTab === 'best') params.sort = 'best';
+      else if (activeTab === 'sale') {
+        params.sort = 'sale';
+        params.filter = 'sale';
+      }
+
+      if (selectedCategory !== 'all') params.categoryId = selectedCategory;
+      // 💡 백엔드로 brandId 파라미터 전송
+      if (selectedBrand !== 'all') params.brandId = selectedBrand;
+
       const response = await getProducts(params);
       if (response.data && response.data.content) {
           setProducts(response.data.content);
+      } else {
+          setProducts([]);
       }
     } catch (error) {
       console.error('상품 로딩 중 오류 발생:', error);
@@ -33,68 +92,180 @@ const ProductListPage = () => {
     }
   };
 
-  // 페이지 진입 시 및 가격 필터 변경 시 데이터 요청
   useEffect(() => {
     fetchProducts();
-  }, [filterPrice]);
+  }, [activeTab, filterPrice, selectedCategory, selectedBrand]);
 
-  // 검색창 엔터키 이벤트 핸들러
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      fetchProducts();
-    }
+    if (e.key === 'Enter') fetchProducts();
+  };
+
+  const tabs = [
+    { id: 'new', label: 'NEW ARRIVALS', path: '/products?sort=new' },
+    { id: 'best', label: 'BEST SELLERS', path: '/products?sort=best' },
+    { id: 'sale', label: 'PRICE DOWN', path: '/products?filter=sale' }
+  ];
+
+  // 배너 렌더링 함수
+  const renderDynamicBanner = () => {
+    switch (activeTab) {
+        case 'new':
+          return (
+            <div className="bg-[#FDFBF7] py-20 px-4 text-center border-b border-[#E5E0D8] relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] opacity-30"></div>
+              <div className="relative z-10 flex flex-col items-center">
+                <span className="flex items-center gap-2 text-[#997B4D] text-[10px] font-black tracking-[0.3em] uppercase mb-4">
+                  <Sparkles size={14} /> Fresh Drops
+                </span>
+                <h1 className="text-4xl md:text-5xl font-serif text-[#2C2C2C] mb-4 tracking-tight">UNUSED & NEW</h1>
+                <p className="text-[#5C5550] text-sm md:text-base max-w-lg mx-auto leading-relaxed">
+                  엄격한 검수를 통과한 <span className="font-bold text-[#2C2C2C]">미사용 신품 및 민트급 상품</span>입니다.<br/>
+                  누구도 소유하지 않은 완벽한 컨디션을 가장 먼저 만나보세요.
+                </p>
+              </div>
+            </div>
+          );
+        case 'best':
+          return (
+            <div className="bg-gradient-to-r from-[#2C2C2C] to-[#1A1A1A] py-20 px-4 text-center border-b-4 border-[#D4AF37] relative">
+              <div className="relative z-10 flex flex-col items-center">
+                <span className="flex items-center gap-2 text-[#D4AF37] text-[10px] font-black tracking-[0.3em] uppercase mb-4">
+                  <Flame size={14} /> Trending Now
+                </span>
+                <h1 className="text-4xl md:text-5xl font-serif text-white mb-4 tracking-tight">BEST SELLERS</h1>
+                <p className="text-gray-400 text-sm md:text-base max-w-lg mx-auto leading-relaxed">
+                  현재 고객님들께 <span className="font-bold text-[#D4AF37]">가장 많은 사랑을 받고 있는</span> 인기 상품입니다.<br/>
+                  검증된 베스트셀러로 후회 없는 선택을 경험하세요.
+                </p>
+              </div>
+            </div>
+          );
+        case 'sale':
+          return (
+            <div className="bg-[#5C2B29] py-20 px-4 text-center relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-red-500 rounded-full blur-[100px] opacity-20"></div>
+              <div className="relative z-10 flex flex-col items-center">
+                <span className="flex items-center gap-2 text-[#F2A6A6] text-[10px] font-black tracking-[0.3em] uppercase mb-4">
+                  <Tag size={14} /> Limited Offer
+                </span>
+                <h1 className="text-4xl md:text-5xl font-serif text-white mb-4 tracking-tight">PRICE DOWN</h1>
+                <p className="text-[#E5C1C0] text-sm md:text-base max-w-lg mx-auto leading-relaxed">
+                  시세 대비 <span className="font-bold text-white underline decoration-red-400 underline-offset-4">합리적인 가격으로 인하된</span> 특별 상품들입니다.<br/>
+                  단 하나의 재고, 망설이는 순간 품절될 수 있습니다.
+                </p>
+              </div>
+            </div>
+          );
+        default:
+          return null;
+      }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fade-in">
-      <div className="flex flex-col items-center mb-12">
-        <h2 className="text-3xl font-serif text-[#2C2C2C] mb-2">All Products</h2>
-        <div className="w-10 h-[1px] bg-[#997B4D] mb-4"></div>
-        <p className="text-sm text-[#888]">엄격한 검수를 거친 100% 정품 중고 명품을 만나보세요.</p>
+    <div className="animate-fade-in font-sans min-h-screen bg-white pb-20">
 
-        {/* 명품 스타일 검색창 */}
-        <div className="mt-8 w-full max-w-md relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#997B4D] transition-colors" size={20} />
-          <input
-            type="text"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="상품명 또는 브랜드명 검색 후 엔터"
-            className="w-full pl-12 pr-4 py-3 bg-[#F4F4F4] border border-transparent rounded-full text-sm font-bold outline-none focus:bg-white focus:border-[#997B4D] focus:shadow-[0_0_15px_rgba(153,123,77,0.1)] transition-all"
-          />
+      {renderDynamicBanner()}
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+
+        <div className="flex flex-col items-center border-b border-[#E5E0D8] mb-12">
+
+          <div className="flex gap-8 md:gap-16">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => navigate(tab.path)}
+                className={`pb-4 text-sm font-bold tracking-widest uppercase transition-colors relative ${
+                  activeTab === tab.id ? 'text-[#D4AF37]' : 'text-[#888] hover:text-[#2C2C2C]'
+                }`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <span className="absolute bottom-0 left-0 w-full h-[2px] bg-[#D4AF37] animate-in slide-in-from-left-2 duration-300"></span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-8 mb-8 w-full max-w-md relative group mx-auto">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#997B4D] transition-colors" size={20} />
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="상품명 또는 브랜드명 검색 후 엔터"
+              className="w-full pl-12 pr-4 py-3 bg-[#F4F4F4] border border-transparent rounded-full text-sm font-bold outline-none focus:bg-white focus:border-[#997B4D] focus:shadow-[0_0_15px_rgba(153,123,77,0.1)] transition-all"
+            />
+          </div>
+
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* 사이드바 필터 영역 */}
+      <div className="flex flex-col md:flex-row gap-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* ================= 좌측 사이드바 필터 ================= */}
         <aside className="w-full md:w-64 flex-shrink-0 space-y-8 hidden md:block">
+
+          {/* 1. 카테고리 필터 */}
           <div>
             <h3 className="text-sm font-bold text-[#2C2C2C] mb-4 pb-2 border-b border-[#E5E0D8] flex items-center gap-2">
               <Filter size={14} /> CATEGORY
             </h3>
             <ul className="space-y-2 text-sm text-[#5C5550]">
+              <li
+                className={`flex items-center gap-2 cursor-pointer transition-colors ${selectedCategory === 'all' ? 'text-[#997B4D] font-bold' : 'hover:text-[#997B4D]'}`}
+                onClick={() => handleFilterChange('categoryId', 'all')}
+              >
+                <div className={`w-4 h-4 border rounded-sm flex items-center justify-center ${selectedCategory === 'all' ? 'bg-[#997B4D] border-[#997B4D]' : 'border-gray-300'}`}>
+                    {selectedCategory === 'all' && <span className="w-2 h-2 bg-white rounded-sm"></span>}
+                </div>
+                <span>모든 카테고리</span>
+              </li>
               {CATEGORIES.map(cat => (
-                <li key={cat.id} className="flex items-center gap-2 hover:text-[#997B4D] cursor-pointer">
-                  <input type="checkbox" className="accent-[#997B4D] rounded-sm" />
+                <li
+                    key={cat.id}
+                    className={`flex items-center gap-2 cursor-pointer transition-colors ${selectedCategory === cat.id ? 'text-[#997B4D] font-bold' : 'hover:text-[#997B4D]'}`}
+                    onClick={() => handleFilterChange('categoryId', cat.id)}
+                >
+                  <div className={`w-4 h-4 border rounded-sm flex items-center justify-center ${selectedCategory === cat.id ? 'bg-[#997B4D] border-[#997B4D]' : 'border-gray-300'}`}>
+                     {selectedCategory === cat.id && <span className="w-2 h-2 bg-white rounded-sm"></span>}
+                  </div>
                   <span>{cat.name}</span>
                 </li>
               ))}
             </ul>
           </div>
 
+          {/* 2. 브랜드 필터 */}
           <div>
             <h3 className="text-sm font-bold text-[#2C2C2C] mb-4 pb-2 border-b border-[#E5E0D8]">BRAND</h3>
             <div className="h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 pr-2 space-y-2 text-sm text-[#5C5550]">
+              <li
+                className={`flex items-center gap-2 cursor-pointer transition-colors list-none ${selectedBrand === 'all' ? 'text-[#997B4D] font-bold' : 'hover:text-[#997B4D]'}`}
+                onClick={() => handleFilterChange('brandId', 'all')}
+              >
+                <div className={`w-4 h-4 border rounded-sm flex items-center justify-center ${selectedBrand === 'all' ? 'bg-[#997B4D] border-[#997B4D]' : 'border-gray-300'}`}>
+                    {selectedBrand === 'all' && <span className="w-2 h-2 bg-white rounded-sm"></span>}
+                </div>
+                <span>모든 브랜드</span>
+              </li>
               {INITIAL_BRANDS.map(brand => (
-                <li key={brand.id} className="flex items-center gap-2 hover:text-[#997B4D] cursor-pointer list-none">
-                  <input type="checkbox" className="accent-[#997B4D] rounded-sm" />
+                <li
+                  key={brand.id}
+                  className={`flex items-center gap-2 cursor-pointer transition-colors list-none ${selectedBrand === brand.id ? 'text-[#997B4D] font-bold' : 'hover:text-[#997B4D]'}`}
+                  onClick={() => handleFilterChange('brandId', brand.id)}
+                >
+                  <div className={`w-4 h-4 border rounded-sm flex items-center justify-center ${selectedBrand === brand.id ? 'bg-[#997B4D] border-[#997B4D]' : 'border-gray-300'}`}>
+                     {selectedBrand === brand.id && <span className="w-2 h-2 bg-white rounded-sm"></span>}
+                  </div>
                   <span>{brand.name}</span>
                 </li>
               ))}
             </div>
           </div>
 
+          {/* 3. 가격 슬라이더 */}
           <div>
             <h3 className="text-sm font-bold text-[#2C2C2C] mb-4 pb-2 border-b border-[#E5E0D8]">PRICE</h3>
             <input
@@ -113,7 +284,7 @@ const ProductListPage = () => {
           </div>
         </aside>
 
-        {/* 메인 상품 리스트 영역 */}
+        {/* ================= 우측 상품 목록 ================= */}
         <main className="flex-1">
           <div className="flex justify-between items-center mb-6">
             <span className="text-xs text-[#888] font-bold">Total <span className="text-[#2C2C2C]">{products.length}</span> items</span>
@@ -121,7 +292,11 @@ const ProductListPage = () => {
               <button className="md:hidden flex items-center gap-1 text-xs font-bold border px-3 py-2 rounded-sm"><Filter size={14} /> 필터</button>
               <div className="relative group">
                 <button className="flex items-center gap-1 text-xs font-bold text-[#5C5550] hover:text-[#997B4D]">
-                  <SlidersHorizontal size={14} /> 신상품순 <ChevronDown size={12} />
+                  <SlidersHorizontal size={14} />
+                  {activeTab === 'new' && '신상품순'}
+                  {activeTab === 'best' && '인기순'}
+                  {activeTab === 'sale' && '할인율순'}
+                  <ChevronDown size={12} />
                 </button>
               </div>
             </div>
@@ -139,7 +314,8 @@ const ProductListPage = () => {
                         image: product.thumbnailUrl || "IMG",
                         brand: product.brandName,
                         name: product.name,
-                        price: product.price
+                        price: product.price,
+                        discountRate: product.discountRate
                     }}
                 />
                 ))}

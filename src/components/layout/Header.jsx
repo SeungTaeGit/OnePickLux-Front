@@ -8,44 +8,57 @@ const Header = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // [추가] 장바구니 개수를 담을 상태 변수 (기본값 0)
   const [cartCount, setCartCount] = useState(0);
-
   const [activeTab, setActiveTab] = useState('category');
-  const [likedCategories, setLikedCategories] = useState([]);
-  const [likedBrands, setLikedBrands] = useState([]);
 
-  // 1. 컴포넌트가 화면에 나타날 때(또는 경로가 바뀔 때) 실행
+  // 드롭다운 내 검색창 상태
+  const [brandSearch, setBrandSearch] = useState('');
+
+  // LocalStorage를 활용하여 새로고침해도 관심 목록 유지
+  const [likedCategories, setLikedCategories] = useState(() => {
+    const saved = localStorage.getItem('likedCategories');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [likedBrands, setLikedBrands] = useState(() => {
+    const saved = localStorage.getItem('likedBrands');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // 상태가 바뀔 때마다 LocalStorage 업데이트
+  useEffect(() => {
+    localStorage.setItem('likedCategories', JSON.stringify(likedCategories));
+  }, [likedCategories]);
+
+  useEffect(() => {
+    localStorage.setItem('likedBrands', JSON.stringify(likedBrands));
+  }, [likedBrands]);
+
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     const loggedIn = !!token;
     setIsLoggedIn(loggedIn);
     setIsMenuOpen(false);
+    setBrandSearch(''); // 메뉴 닫힐 때 검색어 초기화
 
-    // [추가] 2. 로그인 상태라면 백엔드에서 장바구니 개수를 가져옵니다.
     if (loggedIn) {
       fetchCartCount(token);
     } else {
-      setCartCount(0); // 로그아웃 상태면 0으로 초기화
+      setCartCount(0);
     }
   }, [location.pathname]);
 
-  // [추가] 3. 백엔드 API 호출 함수
   const fetchCartCount = async (token) => {
     try {
-      // 본인의 백엔드 서버 주소에 맞게 수정하세요 (예: http://localhost:8080/api/cart/count)
       const response = await fetch('http://localhost:8080/api/cart/count', {
         method: 'GET',
         headers: {
-          // 백엔드(Spring Security)가 사용자를 인식할 수 있도록 토큰을 보냅니다.
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-
       if (response.ok) {
         const result = await response.json();
-        // ApiResponse 구조에 맞게 데이터를 꺼내옵니다. (result.data)
         setCartCount(result.data);
       }
     } catch (error) {
@@ -53,63 +66,92 @@ const Header = () => {
     }
   };
 
+  // Layout Shift(덜컹거림) 방지 로직
   useEffect(() => {
     if (isMenuOpen) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
     } else {
       document.body.style.overflow = 'unset';
+      document.body.style.paddingRight = '0px';
     }
-    return () => { document.body.style.overflow = 'unset'; };
+    return () => {
+      document.body.style.overflow = 'unset';
+      document.body.style.paddingRight = '0px';
+    };
   }, [isMenuOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     setIsLoggedIn(false);
-    setCartCount(0); // 로그아웃 시 장바구니 개수 초기화
+    setCartCount(0);
     alert('로그아웃 되었습니다.');
     navigate('/');
   };
 
-  const categories = ['가방', '시계', '주얼리', '지갑', '의류', '신발'];
-  const brands = [
-    { eng: 'CHANEL', kor: '샤넬' },
-    { eng: 'HERMES', kor: '에르메스' },
-    { eng: 'ROLEX', kor: '롤렉스' },
-    { eng: 'LOUIS VUITTON', kor: '루이비통' },
-    { eng: 'GUCCI', kor: '구찌' },
-    { eng: 'DIOR', kor: '디올' },
-    { eng: 'PRADA', kor: '프라다' },
-    { eng: 'CELINE', kor: '셀린느' },
-    { eng: 'CARTIER', kor: '까르띠에' },
-    { eng: 'GOYARD', kor: '고야드' }
+  const categories = [
+    { id: 1, name: '가방' }, { id: 2, name: '의류' }, { id: 3, name: '주얼리' },
+    { id: 4, name: '신발' }, { id: 5, name: '지갑' }, { id: 6, name: '악세서리' }
   ];
 
-  const toggleLikeCategory = (category) => {
+  const brands = [
+    { eng: 'CHANEL', kor: '샤넬', slug: 'chanel' },
+    { eng: 'HERMES', kor: '에르메스', slug: 'hermes' },
+    { eng: 'ROLEX', kor: '롤렉스', slug: 'rolex' },
+    { eng: 'LOUIS VUITTON', kor: '루이비통', slug: 'louis-vuitton' },
+    { eng: 'DIOR', kor: '디올', slug: 'dior' },
+    { eng: 'GUCCI', kor: '구찌', slug: 'gucci' },
+    { eng: 'PRADA', kor: '프라다', slug: 'prada' },
+    { eng: 'CELINE', kor: '셀린느', slug: 'celine' },
+    { eng: 'CARTIER', kor: '까르띠에', slug: 'cartier' },
+    { eng: 'GOYARD', kor: '고야드', slug: 'goyard' }
+  ];
+
+  // 인기 브랜드 (정적 데이터)
+  const popularBrands = [
+    brands.find(b => b.eng === 'CHANEL'),
+    brands.find(b => b.eng === 'HERMES'),
+    brands.find(b => b.eng === 'ROLEX'),
+    brands.find(b => b.eng === 'DIOR')
+  ].filter(Boolean);
+
+  const toggleLikeCategory = (categoryId) => {
     setLikedCategories(prev =>
-      prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]
+      prev.includes(categoryId) ? prev.filter(id => id !== categoryId) : [...prev, categoryId]
     );
   };
 
-  const toggleLikeBrand = (brandEngName) => {
+  const toggleLikeBrand = (brandSlug) => {
     setLikedBrands(prev =>
-      prev.includes(brandEngName) ? prev.filter(b => b !== brandEngName) : [...prev, brandEngName]
+      prev.includes(brandSlug) ? prev.filter(slug => slug !== brandSlug) : [...prev, brandSlug]
     );
   };
 
-  const unlikedCategories = categories.filter(c => !likedCategories.includes(c));
-  const likedBrandsList = brands.filter(b => likedBrands.includes(b.eng));
-  const unlikedBrandsList = brands.filter(b => !likedBrands.includes(b.eng));
+  const likedCategoriesList = categories.filter(c => likedCategories.includes(c.id));
+  const likedBrandsList = brands.filter(b => likedBrands.includes(b.slug));
+
+  // 검색어에 따른 브랜드 필터링
+  const filteredBrands = brands.filter(b =>
+    b.eng.toLowerCase().includes(brandSearch.toLowerCase()) ||
+    b.kor.includes(brandSearch)
+  );
 
   return (
-    <header className="sticky top-0 z-50 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-[#E5E0D8] relative font-sans">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative z-10 bg-[#FDFBF7]/95">
+    <header className="sticky top-0 z-50 bg-white/75 backdrop-blur-lg border-b border-[#E5E0D8] relative font-sans transition-colors duration-300 hover:bg-white/95">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative z-10">
 
         <div className="flex items-center gap-6 md:gap-10">
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="text-[#2C2C2C] hover:text-[#997B4D] transition flex items-center justify-center"
+            className="text-[#2C2C2C] hover:text-[#997B4D] transition flex items-center justify-center relative w-8 h-8"
           >
-            {isMenuOpen ? <X size={28} strokeWidth={1.5} /> : <Menu size={28} strokeWidth={1.5} />}
+            <div className={`absolute transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isMenuOpen ? 'rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100'}`}>
+              <Menu size={28} strokeWidth={1.5} />
+            </div>
+            <div className={`absolute transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isMenuOpen ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-0 opacity-0'}`}>
+              <X size={28} strokeWidth={1.5} />
+            </div>
           </button>
 
           <Link to="/" className="flex flex-col items-center cursor-pointer group">
@@ -136,7 +178,6 @@ const Header = () => {
           </button>
           <button className="hover:text-[#997B4D] transition"><Search size={20} strokeWidth={1.5} /></button>
 
-          {/* [수정] 장바구니 버튼 클릭 시 /cart 로 이동 & cartCount가 0보다 클 때만 숫자 배지를 보여줌 */}
           <button onClick={() => navigate('/cart')} className="hover:text-[#997B4D] transition relative">
             <ShoppingBag size={20} strokeWidth={1.5} />
             {cartCount > 0 && (
@@ -163,135 +204,167 @@ const Header = () => {
         </div>
       </div>
 
-      {isMenuOpen && (
-        <div className="fixed top-20 left-0 w-full h-[calc(100vh-5rem)] bg-white z-40 border-t border-[#E5E0D8] overflow-y-auto">
-          <div className="max-w-7xl mx-auto h-full flex flex-col md:flex-row px-4 sm:px-6 lg:px-8">
+      <div
+        className={`fixed top-20 left-0 w-full h-[calc(100vh-5rem)] bg-white z-40 border-t border-[#E5E0D8] overflow-y-auto transform transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] origin-top
+          ${isMenuOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-4 pointer-events-none'}`}
+      >
+        <div className="max-w-7xl mx-auto h-full flex flex-col md:flex-row px-4 sm:px-6 lg:px-8">
 
-            <div className="w-full md:w-56 py-8 pr-0 md:pr-8 flex flex-row md:flex-col gap-2 border-b md:border-b-0 md:border-r border-[#E5E0D8]">
-              <button
-                onClick={() => setActiveTab('category')}
-                className={`py-3 px-5 text-left text-sm font-bold tracking-widest transition-all rounded-xl flex items-center justify-between ${
-                  activeTab === 'category'
-                    ? 'bg-[#FDFBF7] text-[#997B4D] shadow-sm'
-                    : 'text-[#5C5550] hover:text-[#2C2C2C] hover:bg-gray-50'
-                }`}
-              >
-                CATEGORIES
-                {activeTab === 'category' && <ChevronRight size={16} />}
-              </button>
-              <button
-                onClick={() => setActiveTab('brand')}
-                className={`py-3 px-5 text-left text-sm font-bold tracking-widest transition-all rounded-xl flex items-center justify-between ${
-                  activeTab === 'brand'
-                    ? 'bg-[#FDFBF7] text-[#997B4D] shadow-sm'
-                    : 'text-[#5C5550] hover:text-[#2C2C2C] hover:bg-gray-50'
-                }`}
-              >
-                BRANDS
-                {activeTab === 'brand' && <ChevronRight size={16} />}
-              </button>
-            </div>
+          {/* 좌측 탭 메뉴 */}
+          <div className="w-full md:w-64 py-12 pr-0 md:pr-10 flex flex-row md:flex-col gap-8 border-b md:border-b-0 md:border-r border-[#E5E0D8]">
+            <button
+              onClick={() => setActiveTab('category')}
+              className={`text-left group flex flex-col ${activeTab === 'category' ? 'opacity-100' : 'opacity-40 hover:opacity-70'} transition-opacity`}
+            >
+              <span className="text-2xl font-serif font-bold text-[#2C2C2C] tracking-wider mb-1">CATEGORY</span>
+              <span className="text-sm text-gray-500">카테고리</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('brand')}
+              className={`text-left group flex flex-col ${activeTab === 'brand' ? 'opacity-100' : 'opacity-40 hover:opacity-70'} transition-opacity`}
+            >
+              <span className="text-2xl font-serif font-bold text-[#1A1A1A] tracking-wider mb-1">BRAND</span>
+              <span className="text-sm text-gray-500">브랜드</span>
+            </button>
+          </div>
 
-            <div className="flex-1 py-8 pl-0 md:pl-12">
-              {activeTab === 'category' ? (
-                <div className="space-y-10">
-                  {likedCategories.length > 0 && (
-                    <div>
-                      <h3 className="text-base font-serif font-bold text-[#997B4D] mb-4 flex items-center gap-2">
-                        <Heart size={18} className="fill-[#997B4D]" /> 관심 카테고리
-                      </h3>
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        {likedCategories.map((category, index) => (
-                          <div key={`liked-cat-${index}`} className="flex items-center justify-between p-3.5 bg-[#FDFBF7] border border-[#997B4D]/30 rounded-xl transition-all hover:shadow-md">
-                            <button
-                              onClick={() => { setIsMenuOpen(false); navigate(`/products?category=${category}`); }}
-                              className="text-sm font-medium text-[#997B4D]"
-                            >
-                              {category}
-                            </button>
-                            <button onClick={() => toggleLikeCategory(category)} className="p-1">
-                              <Heart size={18} className="fill-[#997B4D] text-[#997B4D]" />
-                            </button>
+          {/* 우측 메인 콘텐츠 영역 */}
+          <div className="flex-1 py-12 pl-0 md:pl-16">
+
+            {activeTab === 'brand' && (
+              <div className="animate-fade-in space-y-12">
+
+                {/* 상단 관심/인기 브랜드 박스 영역 */}
+                <div className="flex flex-col xl:flex-row gap-6">
+                  {/* 관심 브랜드 박스 */}
+                  <div className="flex-1 bg-[#F9F9F9] p-8 rounded-sm">
+                    <h3 className="text-sm font-bold text-[#2C2C2C] mb-6">관심 브랜드</h3>
+                    {likedBrandsList.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {likedBrandsList.map(brand => (
+                          <div key={`liked-${brand.slug}`} className="flex items-center gap-1 bg-white border border-[#E5E0D8] px-4 py-2 rounded-full shadow-sm hover:border-[#997B4D] transition-colors">
+                            <button onClick={() => { setIsMenuOpen(false); navigate(`/brand/${brand.slug}`); }} className="text-xs font-bold text-[#5C5550]">{brand.kor}</button>
+                            <button onClick={() => toggleLikeBrand(brand.slug)} className="ml-1"><Heart size={14} className="fill-[#997B4D] text-[#997B4D]"/></button>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="text-center py-6 text-gray-400 text-xs leading-relaxed">
+                        아래 브랜드 리스트에서 <Heart size={12} className="inline text-gray-300"/> 를 누르고<br/>
+                        해당 브랜드의 상품 혜택/소식을 받아보세요.
+                      </div>
+                    )}
+                  </div>
 
-                  <div>
-                    <h3 className="text-base font-serif font-bold text-[#2C2C2C] mb-4">
-                      전체 카테고리
-                    </h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                      {unlikedCategories.map((category, index) => (
-                        <div key={`cat-${index}`} className="flex items-center justify-between p-3.5 bg-gray-50/50 border border-transparent hover:border-[#E5E0D8] hover:bg-white rounded-xl transition-all">
-                          <button
-                            onClick={() => { setIsMenuOpen(false); navigate(`/products?category=${category}`); }}
-                            className="text-sm font-medium text-[#5C5550] hover:text-[#2C2C2C]"
-                          >
-                            {category}
-                          </button>
-                          <button onClick={() => toggleLikeCategory(category)} className="p-1">
-                            <Heart size={18} className="text-[#D1C9C0] hover:text-[#997B4D]" />
+                  {/* 인기 브랜드 박스 */}
+                  <div className="flex-1 bg-[#F9F9F9] p-8 rounded-sm">
+                    <h3 className="text-sm font-bold text-[#2C2C2C] mb-6">인기 브랜드</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {popularBrands.map(brand => (
+                        <div key={`pop-${brand.slug}`} className="flex items-center gap-1 bg-white border border-[#E5E0D8] px-4 py-2 rounded-full shadow-sm hover:border-[#997B4D] transition-colors">
+                          <button onClick={() => { setIsMenuOpen(false); navigate(`/brand/${brand.slug}`); }} className="text-xs font-bold text-[#5C5550]">{brand.kor}</button>
+                          <button onClick={() => toggleLikeBrand(brand.slug)} className="ml-1">
+                            <Heart size={14} className={likedBrands.includes(brand.slug) ? "fill-[#997B4D] text-[#997B4D]" : "text-gray-300 hover:text-[#997B4D]"} />
                           </button>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-10">
-                  {likedBrandsList.length > 0 && (
-                    <div>
-                      <h3 className="text-base font-serif font-bold text-[#997B4D] mb-4 flex items-center gap-2">
-                        <Heart size={18} className="fill-[#997B4D]" /> 관심 브랜드
-                      </h3>
-                      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {likedBrandsList.map((brand, index) => (
-                          <div key={`liked-brand-${index}`} className="flex items-center justify-between p-3.5 bg-[#FDFBF7] border border-[#997B4D]/30 rounded-xl transition-all hover:shadow-md">
-                            <button
-                              onClick={() => { setIsMenuOpen(false); navigate(`/products?brand=${brand.eng}`); }}
-                              className="text-left group-hover:text-[#997B4D] truncate pr-2"
-                            >
-                              <span className="text-sm font-bold text-[#997B4D]">{brand.kor}</span>
-                              <span className="text-[11px] font-serif text-[#B5A591] ml-1.5 uppercase">({brand.eng})</span>
-                            </button>
-                            <button onClick={() => toggleLikeBrand(brand.eng)} className="p-1 shrink-0">
-                              <Heart size={18} className="fill-[#997B4D] text-[#997B4D]" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
-                  <div>
-                    <h3 className="text-base font-serif font-bold text-[#2C2C2C] mb-4">
-                      전체 브랜드
-                    </h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                      {unlikedBrandsList.map((brand, index) => (
-                        <div key={`brand-${index}`} className="flex items-center justify-between p-3.5 bg-gray-50/50 border border-transparent hover:border-[#E5E0D8] hover:bg-white rounded-xl transition-all group">
+                {/* 검색창 */}
+                <div className="relative max-w-md">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="브랜드명을 입력해 주세요."
+                    value={brandSearch}
+                    onChange={(e) => setBrandSearch(e.target.value)}
+                    className="w-full bg-[#F4F4F4] pl-12 pr-4 py-3 rounded-full text-sm font-medium outline-none focus:bg-white focus:border-[#997B4D] border border-transparent transition-colors"
+                  />
+                </div>
+
+                {/* 브랜드 리스트 */}
+                <div>
+                  <div className="flex items-center gap-4 border-b border-[#E5E0D8] pb-4 mb-6 text-sm font-bold text-[#2C2C2C]">
+                    <span>A-Z</span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-gray-400 font-normal">ㄱ-ㅎ</span>
+                  </div>
+
+                  {filteredBrands.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-y-6 gap-x-12">
+                      {filteredBrands.map(brand => (
+                        <div key={`list-${brand.slug}`} className="flex items-center justify-between group py-2">
                           <button
-                            onClick={() => { setIsMenuOpen(false); navigate(`/products?brand=${brand.eng}`); }}
-                            className="text-left truncate pr-2"
+                            onClick={() => { setIsMenuOpen(false); navigate(`/brand/${brand.slug}`); }}
+                            className="flex flex-col text-left"
                           >
-                            <span className="text-sm font-medium text-[#2C2C2C] group-hover:text-[#997B4D] transition-colors">{brand.kor}</span>
-                            <span className="text-[11px] font-serif text-[#8C857E] ml-1.5 uppercase group-hover:text-[#B5A591] transition-colors">({brand.eng})</span>
+                            <span className="text-base font-bold text-[#1A1A1A] group-hover:text-[#997B4D] transition-colors">{brand.eng}</span>
+                            <span className="text-xs text-gray-500 mt-1">{brand.kor}</span>
                           </button>
-                          <button onClick={() => toggleLikeBrand(brand.eng)} className="p-1 shrink-0">
-                            <Heart size={18} className="text-[#D1C9C0] hover:text-[#997B4D]" />
+                          <button onClick={() => toggleLikeBrand(brand.slug)} className="p-2">
+                            <Heart size={18} className={likedBrands.includes(brand.slug) ? "fill-[#997B4D] text-[#997B4D]" : "text-gray-200 group-hover:text-[#997B4D] transition-colors"} />
                           </button>
                         </div>
                       ))}
                     </div>
+                  ) : (
+                     <div className="py-10 text-center text-gray-400 text-sm">검색된 브랜드가 없습니다.</div>
+                  )}
+                </div>
+
+              </div>
+            )}
+
+            {/* 카테고리 탭 영역 (브랜드와 통일감 있게 디자인) */}
+            {activeTab === 'category' && (
+              <div className="animate-fade-in space-y-12">
+                <div className="flex flex-col xl:flex-row gap-6">
+                  <div className="flex-1 bg-[#F9F9F9] p-8 rounded-sm">
+                    <h3 className="text-sm font-bold text-[#2C2C2C] mb-6">관심 카테고리</h3>
+                    {likedCategoriesList.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {likedCategoriesList.map(cat => (
+                          <div key={`liked-cat-${cat.id}`} className="flex items-center gap-1 bg-white border border-[#E5E0D8] px-4 py-2 rounded-full shadow-sm hover:border-[#997B4D] transition-colors">
+                            <button onClick={() => { setIsMenuOpen(false); navigate(`/products?categoryId=${cat.id}`); }} className="text-xs font-bold text-[#5C5550]">{cat.name}</button>
+                            <button onClick={() => toggleLikeCategory(cat.id)} className="ml-1"><Heart size={14} className="fill-[#997B4D] text-[#997B4D]"/></button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-gray-400 text-xs leading-relaxed">
+                        자주 찾는 카테고리에 <Heart size={12} className="inline text-gray-300"/> 를 눌러보세요.
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 hidden xl:block"></div> {/* 균형을 위한 빈 공간 */}
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-bold text-[#2C2C2C] border-b border-[#E5E0D8] pb-4 mb-6">전체 카테고리</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-y-6 gap-x-12">
+                    {categories.map(cat => (
+                      <div key={`list-cat-${cat.id}`} className="flex items-center justify-between group py-2 border-b border-transparent hover:border-gray-100">
+                        <button
+                          onClick={() => { setIsMenuOpen(false); navigate(`/products?categoryId=${cat.id}`); }}
+                          className="text-base font-medium text-[#2C2C2C] group-hover:text-[#997B4D] transition-colors"
+                        >
+                          {cat.name}
+                        </button>
+                        <button onClick={() => toggleLikeCategory(cat.id)} className="p-2">
+                          <Heart size={18} className={likedCategories.includes(cat.id) ? "fill-[#997B4D] text-[#997B4D]" : "text-gray-200 group-hover:text-[#997B4D] transition-colors"} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
 };

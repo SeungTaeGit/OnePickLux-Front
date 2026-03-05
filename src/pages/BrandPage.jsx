@@ -3,32 +3,38 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ProductCard from '../components/common/ProductCard.jsx';
 import { getProducts } from '../api/productApi.js';
 
-// 브랜드별 고유 이미지나 설명을 매핑해두는 객체입니다. (실무에서는 DB에서 관리하기도 합니다)
+// 💡 프론트엔드와 백엔드의 ID를 매핑 (실제 DB의 Brand ID와 일치해야 합니다)
 const BRAND_INFO = {
-  'chanel': { kor: '샤넬', desc: '세기를 뛰어넘는 우아함의 대명사', bg: 'bg-[#1A1A1A]', text: 'text-white' },
-  'hermes': { kor: '에르메스', desc: '장인정신이 깃든 최고의 럭셔리', bg: 'bg-[#F37021]', text: 'text-white' },
-  'rolex': { kor: '롤렉스', desc: '성공의 상징, 변치 않는 가치', bg: 'bg-[#006039]', text: 'text-white' },
-  'louis-vuitton': { kor: '루이비통', desc: '여행의 예술을 담은 모노그램', bg: 'bg-[#3E3222]', text: 'text-[#D4AF37]' },
-  'dior': { kor: '디올', desc: '여성성을 극대화한 프렌치 시크', bg: 'bg-[#E5E0D8]', text: 'text-[#2C2C2C]' }
+  'hermes': { id: 1, kor: '에르메스', desc: '장인정신이 깃든 최고의 럭셔리', bg: 'bg-[#F37021]', text: 'text-white' },
+  'chanel': { id: 2, kor: '샤넬', desc: '세기를 뛰어넘는 우아함의 대명사', bg: 'bg-[#1A1A1A]', text: 'text-white' },
+  'rolex': { id: 3, kor: '롤렉스', desc: '성공의 상징, 변치 않는 가치', bg: 'bg-[#006039]', text: 'text-white' },
+  'louis-vuitton': { id: 4, kor: '루이비통', desc: '여행의 예술을 담은 모노그램', bg: 'bg-[#3E3222]', text: 'text-[#D4AF37]' },
+  'dior': { id: 5, kor: '디올', desc: '여성성을 극대화한 프렌치 시크', bg: 'bg-[#E5E0D8]', text: 'text-[#2C2C2C]' }
 };
 
 const BrandPage = () => {
-  // URL에서 브랜드 이름(영어)을 가져옵니다. (예: /brand/chanel)
   const { brandName } = useParams();
   const navigate = useNavigate();
 
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const brandInfo = BRAND_INFO[brandName?.toLowerCase()] || { kor: brandName?.toUpperCase(), desc: '프리미엄 럭셔리 브랜드', bg: 'bg-[#2C2C2C]', text: 'text-white' };
+  const brandInfo = BRAND_INFO[brandName?.toLowerCase()];
 
   useEffect(() => {
     const fetchBrandProducts = async () => {
+      // 매핑된 브랜드 정보가 없으면 (잘못된 URL 등) 실행 방지
+      if (!brandInfo) return;
+
       setIsLoading(true);
       try {
-        // 💡 백엔드에 요청할 때 keyword나 brandId를 파라미터로 넘깁니다.
-        // (현재 백엔드 Specification에 keyword 검색이 있으므로 한글 브랜드명으로 검색하도록 세팅했습니다)
-        const response = await getProducts({ page: 0, size: 20, sort: 'createdAt,desc', keyword: brandInfo.kor });
+        // 💡 [핵심] 키워드 검색(LIKE)이 아닌 정확한 brandId(=)로 요청합니다!
+        const response = await getProducts({
+          page: 0,
+          size: 20,
+          sort: 'createdAt,desc',
+          brandId: brandInfo.id
+        });
 
         if (response.data && response.data.content) {
           setProducts(response.data.content);
@@ -42,13 +48,18 @@ const BrandPage = () => {
       }
     };
     fetchBrandProducts();
-  }, [brandName, brandInfo.kor]);
+  }, [brandName, brandInfo]); // URL이 바뀔 때마다 재실행
+
+  // 잘못된 브랜드 URL 접근 시
+  if (!brandInfo) {
+    return <div className="py-32 text-center text-xl font-bold">존재하지 않는 브랜드관입니다.</div>;
+  }
 
   return (
     <div className="animate-fade-in font-sans pb-20">
 
-      {/* 1. 브랜드관 상단 대형 배너 (브랜드 컬러 적용) */}
-      <div className={`w-full py-24 md:py-32 flex flex-col items-center justify-center ${brandInfo.bg} ${brandInfo.text}`}>
+      {/* 브랜드관 상단 대형 배너 */}
+      <div className={`w-full py-24 md:py-32 flex flex-col items-center justify-center transition-colors ${brandInfo.bg} ${brandInfo.text}`}>
         <h1 className="text-5xl md:text-7xl font-serif font-bold tracking-widest uppercase mb-4">
           {brandName}
         </h1>
@@ -57,7 +68,6 @@ const BrandPage = () => {
         </p>
       </div>
 
-      {/* 2. 상품 리스트 영역 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
         <div className="flex items-center justify-between mb-10 border-b border-[#E5E0D8] pb-4">
           <h2 className="text-xl font-bold text-[#2C2C2C]">
