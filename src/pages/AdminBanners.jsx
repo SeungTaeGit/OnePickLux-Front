@@ -202,7 +202,8 @@ const AdminBanners = () => {
                      <tr key={banner.id} className="hover:bg-gray-50 transition-colors group">
                        <td className="p-4 w-48">
                          <div className="w-40 h-20 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative group-hover:shadow-md transition-shadow">
-                           <img src={`http://localhost:8080${banner.imageUrl}`} alt={banner.title} className="w-full h-full object-cover" />
+                           {/* 💡 [핵심 수정] 주소가 http로 시작하면(S3) 그대로 쓰고, 아니면 localhost:8080을 붙입니다. */}
+                           <img src={banner.imageUrl?.startsWith('http') ? banner.imageUrl : `http://localhost:8080${banner.imageUrl}`} alt={banner.title} className="w-full h-full object-cover" />
                            {!banner.active && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px]"></div>}
                          </div>
                        </td>

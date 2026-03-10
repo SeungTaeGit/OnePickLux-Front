@@ -152,7 +152,7 @@ const BannerSection = () => {
               <div className="w-full h-full relative overflow-hidden bg-gray-100">
                 <div className="absolute inset-0 bg-black/5 group-hover/banner:bg-black/0 transition-colors duration-500 z-10"></div>
                 <img
-                  src={`http://localhost:8080${banner.imageUrl}`}
+                  src={banner.imageUrl?.startsWith('http') ? banner.imageUrl : `http://localhost:8080${banner.imageUrl}`}
                   alt={banner.title}
                   className="w-full h-full object-cover group-hover/banner:scale-105 transition-transform duration-[1500ms] pointer-events-none"
                 />

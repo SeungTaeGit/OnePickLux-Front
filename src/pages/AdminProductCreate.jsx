@@ -17,8 +17,13 @@ const AdminProductCreate = () => {
     description: ''
   });
 
+  // 1. 썸네일 상태
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+
+  // 💡 2. 상세 이미지 다중 업로드 상태 추가
+  const [detailImages, setDetailImages] = useState([]);
+  const [detailPreviews, setDetailPreviews] = useState([]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -35,6 +40,23 @@ const AdminProductCreate = () => {
     }
   };
 
+  // 💡 상세 이미지 다중 선택 핸들러
+  const handleDetailImagesChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      setDetailImages(prev => [...prev, ...files]);
+
+      const newPreviews = files.map(file => URL.createObjectURL(file));
+      setDetailPreviews(prev => [...prev, ...newPreviews]);
+    }
+  };
+
+  // 💡 상세 이미지 개별 삭제 핸들러
+  const removeDetailImage = (index) => {
+    setDetailImages(prev => prev.filter((_, i) => i !== index));
+    setDetailPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
@@ -42,33 +64,38 @@ const AdminProductCreate = () => {
       return;
     }
 
-    // 💡 이미지와 데이터를 함께 보내기 위해 FormData 사용
+    // FormData 생성
     const data = new FormData();
-    data.append('image', selectedFile);
 
-    // 나머지 데이터들을 문자열화하거나 개별 append
-    data.append('brandId', formData.brandId);
-    data.append('categoryId', formData.categoryId);
-    data.append('name', formData.name);
-    data.append('price', formData.price);
-    data.append('discountRate', formData.discountRate);
-    data.append('status', formData.status);
-    data.append('grade', formData.grade);
-    data.append('description', formData.description);
+    // 💡 1. 텍스트 데이터를 Blob으로 감싸서 'request'라는 이름으로 추가 (@RequestPart("request") 매칭)
+    const requestBlob = new Blob([JSON.stringify(formData)], { type: 'application/json' });
+    data.append('request', requestBlob);
+
+    // 💡 2. 썸네일 파일 추가 (@RequestPart("thumbnail") 매칭)
+    data.append('thumbnail', selectedFile);
+
+    // 💡 3. 상세 이미지 파일들 다중 추가 (@RequestPart("detailImages") 매칭)
+    detailImages.forEach((file) => {
+      data.append('detailImages', file);
+    });
 
     try {
       const token = localStorage.getItem('accessToken');
-      await axios.post('http://localhost:8080/api/admin/products/new', data, {
+      // 💡 URL 수정: /new 제거 (Controller의 @PostMapping("/products")와 매칭)
+      await axios.post('http://localhost:8080/api/admin/products', data, {
         headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
+          Authorization: `Bearer ${token}`
+          // 🚨 주의: 'Content-Type': 'multipart/form-data'는 브라우저가 Boundary 설정을 하도록 생략합니다.
         }
       });
       alert('상품이 성공적으로 등록되었습니다.');
+
       // 폼 초기화
       setFormData({ brandId: 1, categoryId: 1, name: '', price: '', discountRate: 0, status: 'SELLING', grade: 'S', description: '' });
       setSelectedFile(null);
       setPreviewUrl('');
+      setDetailImages([]);
+      setDetailPreviews([]);
     } catch (error) {
       console.error('상품 등록 실패:', error);
       alert('상품 등록 중 오류가 발생했습니다.');
@@ -81,8 +108,10 @@ const AdminProductCreate = () => {
 
         {/* 왼쪽: 이미지 업로드 영역 */}
         <div className="lg:col-span-1 space-y-6">
+
+          {/* 1. 메인 썸네일 업로드 */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Product Image</h3>
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Main Thumbnail</h3>
             <div className="relative aspect-square border-2 border-dashed border-gray-200 bg-gray-50 rounded-2xl overflow-hidden flex flex-col items-center justify-center group cursor-pointer">
               <input
                 type="file"
@@ -104,8 +133,48 @@ const AdminProductCreate = () => {
                 </div>
               )}
             </div>
-            <p className="text-[10px] text-gray-400 mt-3 text-center">권장 사이즈: 1000x1000px (1:1 비율)</p>
+            <p className="text-[10px] text-gray-400 mt-3 text-center">권장 사이즈: 1000x1000px (1장 필수)</p>
           </div>
+
+          {/* 💡 2. 상세 이미지 다중 업로드 영역 추가 */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center justify-between">
+              Detail Images
+              <span className="text-[10px] text-gray-400 font-normal normal-case">최대 10장</span>
+            </h3>
+
+            {/* 파일 선택 버튼 (Multiple) */}
+            <div className="relative border-2 border-dashed border-gray-200 bg-gray-50 rounded-xl p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors mb-4">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleDetailImagesChange}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+              />
+              <ImageIcon size={24} className="mx-auto text-gray-400 mb-1" />
+              <p className="text-[10px] font-bold text-gray-500">클릭하여 여러 장 추가</p>
+            </div>
+
+            {/* 미리보기 그리드 */}
+            {detailPreviews.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {detailPreviews.map((preview, index) => (
+                  <div key={index} className="relative aspect-square border border-gray-200 rounded-lg overflow-hidden group bg-white">
+                    <img src={preview} alt={`상세 미리보기 ${index}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeDetailImage(index)}
+                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
 
         {/* 오른쪽: 상세 정보 입력 영역 */}

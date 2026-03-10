@@ -65,6 +65,17 @@ const CartPage = () => {
     navigate(`/products/${productId}`);
   };
 
+  // 💡 [S3 이미지 처리 로직 추가]
+  // DB에 파일명(Key)만 저장되어 있을 경우를 대비한 헬퍼 함수
+  const getImageUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path; // 이미 전체 URL인 경우 통과
+
+    // TODO: 본인의 S3 버킷 주소나 CloudFront 도메인으로 변경하세요.
+    const S3_BASE_URL = import.meta.env.VITE_S3_BASE_URL || 'https://your-bucket-name.s3.ap-northeast-2.amazonaws.com';
+    return `${S3_BASE_URL}/${path.startsWith('/') ? path.slice(1) : path}`;
+  };
+
   const totalPrice = cartItems.reduce((acc, item) => acc + (item.price * item.count), 0);
 
   if (loading) {
@@ -97,8 +108,9 @@ const CartPage = () => {
                     className="w-32 h-32 bg-[#F4F4F4] shrink-0 cursor-pointer rounded-sm overflow-hidden"
                     onClick={() => handleGoToProduct(item.productId)}
                   >
+                    {/* 💡 [수정] getImageUrl 함수 적용 */}
                     {item.thumbnailUrl ? (
-                      <img src={item.thumbnailUrl} alt={item.productName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <img src={getImageUrl(item.thumbnailUrl)} alt={item.productName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[#CCC] font-serif text-sm">NO IMAGE</div>
                     )}

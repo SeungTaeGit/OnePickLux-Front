@@ -58,11 +58,9 @@ const ProductDetailPage = () => {
     }
   };
 
-  // 💡 [핵심 추가] 장바구니 담기 함수
   const handleAddToCart = async () => {
     const token = localStorage.getItem('accessToken');
 
-    // 1. 비로그인 상태면 로그인 페이지로 유도
     if (!token) {
       alert('장바구니 기능은 로그인이 필요합니다.');
       navigate('/login');
@@ -70,7 +68,6 @@ const ProductDetailPage = () => {
     }
 
     try {
-      // 2. 백엔드 API 호출 (단일 상품이므로 count는 무조건 1로 고정)
       const response = await axios.post('http://localhost:8080/api/cart',
         {
           productId: parseInt(id),
@@ -84,27 +81,35 @@ const ProductDetailPage = () => {
         }
       );
 
-      // 3. 성공 시 처리
       if (response.data.status === 'OK' || response.status === 200) {
-        // 사용자에게 장바구니로 바로 이동할지 묻습니다.
         if (window.confirm('장바구니에 상품이 담겼습니다. 장바구니로 이동하시겠습니까?')) {
           navigate('/cart');
         } else {
-          // 이동하지 않고 현재 페이지에 남을 경우, 헤더의 장바구니 숫자를 갱신하기 위해 새로고침(또는 상태 업데이트)
           window.location.reload();
         }
       }
     } catch (error) {
-      // 4. 실패 시 처리 (특히 백엔드에서 던진 "이미 담긴 상품입니다" 예외 처리)
       console.error('장바구니 담기 오류:', error);
 
-      // 백엔드의 GlobalExceptionHandler가 에러 메시지를 response.data.message 등에 담아준다고 가정
       if (error.response && error.response.data && error.response.data.message) {
         alert(error.response.data.message);
       } else {
         alert('이미 장바구니에 담긴 상품이거나 처리 중 오류가 발생했습니다.');
       }
     }
+  };
+
+  // 💡 [S3 이미지 처리 로직 추가]
+  // Spring Boot DB에 전체 URL이 아닌 파일명(Key)만 저장되어 있을 경우를 대비한 헬퍼 함수입니다.
+  // 백엔드에서 이미 "https://..." 로 시작하는 전체 URL을 준다면 그대로 반환하고,
+  // 파일명만 준다면 S3(또는 CloudFront) 기본 도메인을 앞에 붙여줍니다.
+  const getImageUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path; // 이미 전체 URL인 경우 통과
+
+    // TODO: 본인의 S3 버킷 주소나 CloudFront 도메인으로 변경하세요. (환경변수로 빼는 것을 권장합니다)
+    const S3_BASE_URL = import.meta.env.VITE_S3_BASE_URL || 'https://your-bucket-name.s3.ap-northeast-2.amazonaws.com';
+    return `${S3_BASE_URL}/${path.startsWith('/') ? path.slice(1) : path}`;
   };
 
   if (loading) return <div className="py-20 text-center text-[#888]">Loading detail...</div>;
@@ -121,8 +126,9 @@ const ProductDetailPage = () => {
 
       <div className="grid md:grid-cols-2 gap-12 lg:gap-20">
         <div className="relative aspect-square bg-[#F4F4F4] rounded-sm overflow-hidden group">
+           {/* 💡 [수정] getImageUrl 함수를 거쳐서 안전하게 S3 이미지를 불러오도록 변경 */}
            {detail.thumbnailUrl ? (
-             <img src={detail.thumbnailUrl} alt={detail.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+             <img src={getImageUrl(detail.thumbnailUrl)} alt={detail.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
            ) : (
              <div className="absolute inset-0 flex items-center justify-center text-[#CCC] font-serif text-2xl tracking-widest group-hover:scale-105 transition-transform duration-700">IMAGE</div>
            )}
@@ -171,7 +177,6 @@ const ProductDetailPage = () => {
             >
               <Heart size={20} className={`transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-[#2C2C2C] group-hover:text-red-500'}`} />
             </button>
-            {/* 💡 [수정] ADD TO CART 버튼에 onClick 이벤트 연결 */}
             <button
               onClick={handleAddToCart}
               className="flex-1 border border-[#E5E0D8] text-[#2C2C2C] py-4 font-bold text-sm tracking-widest hover:border-[#2C2C2C] transition flex items-center justify-center gap-2 bg-white hover:bg-gray-50"
@@ -199,7 +204,6 @@ const ProductDetailPage = () => {
               <h3 className="text-xl font-serif text-[#2C2C2C] mb-4">Product Details</h3>
               <p className="text-sm text-[#5C5550] leading-loose">{detail.description || "전문 감정사가 엄격한 기준에 따라 검수를 완료한 100% 정품입니다."}</p>
             </div>
-            {/* 기존 검수 리포트 내용이 있다면 이 아래에 유지됩니다 */}
          </div>
       </div>
     </div>
