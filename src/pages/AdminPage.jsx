@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, Package, Tag, Image as ImageIcon, PlusCircle } from 'lucide-react';
+import { Tag as TagIcon } from 'lucide-react';
 
 import AdminDashboard from './AdminDashboard';
 import AdminProducts from './AdminProducts';
 import AdminProductCreate from './AdminProductCreate';
 import AdminRequests from './AdminRequests';
 import AdminBanners from './AdminBanners';
+import AdminBrands from './AdminBrands';
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -24,6 +26,7 @@ const AdminPage = () => {
             { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
             { id: 'products', icon: Package, label: 'Product Stock' },
             { id: 'product-create', icon: PlusCircle, label: 'Product Create' },
+            { id: 'brands', icon: TagIcon, label: 'Brand Config' },
             { id: 'requests', icon: Tag, label: 'Selling Requests' },
             { id: 'banners', icon: ImageIcon, label: 'Banner Management' }
           ].map(item => (
@@ -57,6 +60,7 @@ const AdminPage = () => {
         {activeTab === 'dashboard' && <AdminDashboard />}
         {activeTab === 'products' && <AdminProducts />}
         {activeTab === 'product-create' && <AdminProductCreate />}
+        {activeTab === 'brands' && <AdminBrands />}
         {activeTab === 'requests' && <AdminRequests />}
         {activeTab === 'banners' && <AdminBanners />}
       </main>

@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Filter, SlidersHorizontal, ChevronDown, ChevronRight, Search, Tag, Sparkles, Flame } from 'lucide-react';
+import axios from 'axios';
 import ProductCard from '../components/common/ProductCard.jsx';
-import { CATEGORIES, INITIAL_BRANDS } from '../constants/data.js';
 import { getProducts } from '../api/productApi.js';
+
+const CATEGORIES = [
+  { id: 1, name: '가방' },
+  { id: 2, name: '의류' },
+  { id: 6, name: '주얼리' },
+  { id: 4, name: '신발' },
+  { id: 5, name: '지갑' },
+  { id: 3, name: '악세서리' }
+];
 
 const ProductListPage = () => {
   const location = useLocation();
@@ -13,7 +22,6 @@ const ProductListPage = () => {
   const urlSort = queryParams.get('sort');
   const urlFilter = queryParams.get('filter');
   const urlCategoryId = queryParams.get('categoryId');
-  // 💡 URL에서 brandId 추출
   const urlBrandId = queryParams.get('brandId');
 
   let initialTab = 'new';
@@ -27,8 +35,30 @@ const ProductListPage = () => {
   const [loading, setLoading] = useState(true);
 
   const [selectedCategory, setSelectedCategory] = useState(urlCategoryId ? Number(urlCategoryId) : 'all');
-  // 💡 선택된 브랜드를 상태로 관리
   const [selectedBrand, setSelectedBrand] = useState(urlBrandId ? Number(urlBrandId) : 'all');
+  const [brands, setBrands] = useState([]);
+
+  // 💡 [핵심 수정] 관리자 API가 아닌 퍼블릭 API 호출 (토큰 불필요)
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        // admin 경로가 빠진 일반 고객용 API 주소!
+        const response = await axios.get('http://localhost:8080/api/brands/active');
+
+        let fetchedBrands = [];
+        if (response.data && Array.isArray(response.data.data)) {
+          fetchedBrands = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          fetchedBrands = response.data;
+        }
+
+        setBrands(fetchedBrands);
+      } catch (error) {
+        console.error('🚨 브랜드 필터 로딩 중 오류 발생:', error);
+      }
+    };
+    fetchBrands();
+  }, []);
 
   useEffect(() => {
     let tab = 'new';
@@ -36,7 +66,6 @@ const ProductListPage = () => {
     if (currentParams.get('filter') === 'sale') tab = 'sale';
     else if (currentParams.get('sort') === 'best') tab = 'best';
 
-    // URL이 바뀔 때 상태 동기화
     const categoryId = currentParams.get('categoryId');
     setSelectedCategory(categoryId ? Number(categoryId) : 'all');
 
@@ -46,15 +75,14 @@ const ProductListPage = () => {
     setActiveTab(tab);
   }, [location.search]);
 
-  // 💡 [핵심] 기존 URL 파라미터를 유지하면서 필터를 추가/제거하는 함수
   const handleFilterChange = (key, value) => {
     const params = new URLSearchParams(location.search);
     if (value === 'all') {
-      params.delete(key); // 전체보기를 누르면 해당 파라미터 삭제
+      params.delete(key);
     } else {
-      params.set(key, value); // 새로운 파라미터 덮어쓰기/추가
+      params.set(key, value);
     }
-    params.delete('page'); // 필터가 바뀌면 1페이지로 초기화해야 함
+    params.delete('page');
     navigate(`/products?${params.toString()}`);
   };
 
@@ -76,7 +104,6 @@ const ProductListPage = () => {
       }
 
       if (selectedCategory !== 'all') params.categoryId = selectedCategory;
-      // 💡 백엔드로 brandId 파라미터 전송
       if (selectedBrand !== 'all') params.brandId = selectedBrand;
 
       const response = await getProducts(params);
@@ -106,7 +133,6 @@ const ProductListPage = () => {
     { id: 'sale', label: 'PRICE DOWN', path: '/products?filter=sale' }
   ];
 
-  // 배너 렌더링 함수
   const renderDynamicBanner = () => {
     switch (activeTab) {
         case 'new':
@@ -237,7 +263,7 @@ const ProductListPage = () => {
             </ul>
           </div>
 
-          {/* 2. 브랜드 필터 */}
+          {/* 2. 브랜드 필터 (퍼블릭 API 연동) */}
           <div>
             <h3 className="text-sm font-bold text-[#2C2C2C] mb-4 pb-2 border-b border-[#E5E0D8]">BRAND</h3>
             <div className="h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 pr-2 space-y-2 text-sm text-[#5C5550]">
@@ -250,18 +276,23 @@ const ProductListPage = () => {
                 </div>
                 <span>모든 브랜드</span>
               </li>
-              {INITIAL_BRANDS.map(brand => (
-                <li
-                  key={brand.id}
-                  className={`flex items-center gap-2 cursor-pointer transition-colors list-none ${selectedBrand === brand.id ? 'text-[#997B4D] font-bold' : 'hover:text-[#997B4D]'}`}
-                  onClick={() => handleFilterChange('brandId', brand.id)}
-                >
-                  <div className={`w-4 h-4 border rounded-sm flex items-center justify-center ${selectedBrand === brand.id ? 'bg-[#997B4D] border-[#997B4D]' : 'border-gray-300'}`}>
-                     {selectedBrand === brand.id && <span className="w-2 h-2 bg-white rounded-sm"></span>}
-                  </div>
-                  <span>{brand.name}</span>
-                </li>
-              ))}
+
+              {brands.map(brand => {
+                const brandId = brand.id || brand.brandId;
+                const brandName = brand.name || brand.koreanName || brand.englishName;
+                return (
+                  <li
+                    key={brandId}
+                    className={`flex items-center gap-2 cursor-pointer transition-colors list-none ${selectedBrand === brandId ? 'text-[#997B4D] font-bold' : 'hover:text-[#997B4D]'}`}
+                    onClick={() => handleFilterChange('brandId', brandId)}
+                  >
+                    <div className={`w-4 h-4 border rounded-sm flex items-center justify-center ${selectedBrand === brandId ? 'bg-[#997B4D] border-[#997B4D]' : 'border-gray-300'}`}>
+                       {selectedBrand === brandId && <span className="w-2 h-2 bg-white rounded-sm"></span>}
+                    </div>
+                    <span>{brandName}</span>
+                  </li>
+                );
+              })}
             </div>
           </div>
 
