@@ -1,15 +1,23 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom'; // 💡 현재 URL을 알아내기 위해 추가
 import {
-  MessageCircle, // 카카오톡 대체용
+  MessageCircle,
   Instagram,
-  Zap,           // 번개장터 (번개)
-  Carrot,        // 당근마켓 (당근)
-  ShoppingBag,   // 후루츠패밀리 (쇼핑백)
-  ArrowUp,       // 맨 위로
-  ArrowDown      // 맨 아래로
+  Zap,
+  Carrot,
+  ShoppingBag,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 
 const FloatingQuickMenu = () => {
+  const location = useLocation(); // 💡 현재 경로 가져오기
+
+  // 💡 [핵심] 현재 접속한 URL 경로가 '/admin'으로 시작하면 메뉴를 렌더링하지 않습니다.
+  if (location.pathname.startsWith('/admin')) {
+    return null;
+  }
+
   // 💡 부드럽게 스크롤을 맨 위/아래로 이동시키는 함수
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -30,8 +38,8 @@ const FloatingQuickMenu = () => {
   };
 
   const quickLinks = [
-    { name: '카카오 문의', icon: MessageCircle, bg: 'bg-[#FEE500]', text: 'text-black', url: '#' }, // 링크 대기 중
-    { name: '인스타그램', icon: Instagram, bg: 'bg-gradient-to-tr from-[#FD1D1D] to-[#833AB4]', text: 'text-white', url: '#' }, // 링크 대기 중
+    { name: '카카오 문의', icon: MessageCircle, bg: 'bg-[#FEE500]', text: 'text-black', url: '#' },
+    { name: '인스타그램', icon: Instagram, bg: 'bg-gradient-to-tr from-[#FD1D1D] to-[#833AB4]', text: 'text-white', url: '#' },
     { name: '번개장터', icon: Zap, bg: 'bg-[#D32F2F]', text: 'text-white', url: 'https://m.bunjang.co.kr/' },
     { name: '당근마켓', icon: Carrot, bg: 'bg-[#FF8A3D]', text: 'text-white', url: 'https://www.daangn.com/' },
     { name: 'FruitsFamily', icon: ShoppingBag, bg: 'bg-[#2C2C2C]', text: 'text-white', url: 'https://fruitsfamily.com/' },
@@ -52,7 +60,7 @@ const FloatingQuickMenu = () => {
       </button>
 
       {/* 2. SNS 및 중고 플랫폼 링크들 */}
-      <div className="flex flex-col gap-2 my-2 p-2 bg-white/80 backdrop-blur-md border border-gray-100 rounded-full shadow-sm">
+      <div className="flex flex-col gap-2 my-2 p-2 bg-white/80 backdrop-blur-md border border-gray-100 rounded-full shadow-sm relative">
         {quickLinks.map((link, idx) => (
           <div key={idx} className="relative group">
             <button
@@ -81,5 +89,4 @@ const FloatingQuickMenu = () => {
   );
 };
 
-// 🚨🚨🚨 이 부분이 빠져있어서 발생한 에러입니다! 반드시 파일 맨 끝에 이 줄이 있어야 합니다. 🚨🚨🚨
 export default FloatingQuickMenu;

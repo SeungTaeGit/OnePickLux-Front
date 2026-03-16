@@ -15,6 +15,7 @@ const AdminProductCreate = () => {
     name: '',
     price: '',
     discountRate: 0,
+    type: 'PRE_OWNED', // 💡 [추가] 기본값을 '중고 명품'으로 설정
     status: 'SELLING',
     grade: 'S',
     description: ''
@@ -38,8 +39,6 @@ const AdminProductCreate = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      console.log("✅ 원본 브랜드 목록 로드 성공:", brandRes.data);
-
       let allBrands = [];
       if (brandRes.data && Array.isArray(brandRes.data.data)) {
         allBrands = brandRes.data.data;
@@ -47,15 +46,7 @@ const AdminProductCreate = () => {
         allBrands = brandRes.data;
       }
 
-      if (allBrands.length > 0) {
-        console.log("🧐 첫 번째 브랜드 데이터 구조 확인 (필드명 체크용):", allBrands[0]);
-      }
-
-      // 💡 [핵심 수정] 관리자는 비활성화(display: false)된 브랜드도 상품 등록 시 선택할 수 있어야 합니다.
-      // 따라서 깐깐했던 필터링 로직을 제거하고 무조건 모두 드롭다운에 넣습니다!
       const fetchedBrands = allBrands;
-
-      console.log("🎯 드롭다운에 들어갈 브랜드 세팅 완료:", fetchedBrands);
       setBrandList(fetchedBrands);
 
       // 카테고리 임시 하드코딩
@@ -65,11 +56,10 @@ const AdminProductCreate = () => {
       ];
       setCategoryList(fetchedCategories);
 
-      // 첫 번째 항목으로 드롭다운 초기화
       if (fetchedBrands.length > 0 && fetchedCategories.length > 0) {
         setFormData(prev => ({
           ...prev,
-          brandId: fetchedBrands[0].id || fetchedBrands[0].brandId, // id 필드명 방어
+          brandId: fetchedBrands[0].id || fetchedBrands[0].brandId,
           categoryId: fetchedCategories[0].id
         }));
       }
@@ -82,7 +72,13 @@ const AdminProductCreate = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+    // 💡 [UX 디테일] 새상품(병행수입)을 선택하면 등급을 강제로 'NEW'로 맞춰주는 센스!
+    if (name === 'type' && value === 'PARALLEL_IMPORT') {
+      setFormData(prev => ({ ...prev, [name]: value, grade: 'NEW' }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleFileChange = (e) => {
@@ -130,6 +126,7 @@ const AdminProductCreate = () => {
       name: formData.name,
       price: Number(formData.price),
       discountRate: Number(formData.discountRate || 0),
+      type: formData.type, // 💡 [추가] 선택한 타입을 백엔드로 전송
       status: formData.status,
       grade: formData.grade,
       description: formData.description
@@ -153,7 +150,7 @@ const AdminProductCreate = () => {
       setFormData({
         brandId: brandList[0]?.id || '',
         categoryId: categoryList[0]?.id || '',
-        name: '', price: '', discountRate: 0, status: 'SELLING', grade: 'S', description: ''
+        name: '', price: '', discountRate: 0, type: 'PRE_OWNED', status: 'SELLING', grade: 'S', description: ''
       });
       setSelectedFile(null);
       setPreviewUrl('');
@@ -247,6 +244,15 @@ const AdminProductCreate = () => {
               <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="예: 샤넬 19 핸드백 램스킨 블랙 금장" className="w-full border-2 border-gray-100 rounded-xl p-3 text-sm font-bold focus:border-[#D4AF37] outline-none" required />
             </div>
 
+            {/* 💡 [추가] 상품 타입(중고/병행수입) 선택 드롭다운 */}
+            <div className="bg-[#FAFAFA] p-4 rounded-xl border border-gray-200">
+              <label className="block text-[10px] font-black text-[#D4AF37] uppercase mb-2">Product Type (상품 유형)</label>
+              <select name="type" value={formData.type} onChange={handleChange} className="w-full border-2 border-gray-100 rounded-xl p-3 text-sm font-bold focus:border-[#D4AF37] outline-none bg-white">
+                <option value="PRE_OWNED">일반 중고 명품 (Pre-owned)</option>
+                <option value="PARALLEL_IMPORT">병행수입 새상품 (Boutique)</option>
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-2">Selling Price (원)</label>
@@ -261,14 +267,19 @@ const AdminProductCreate = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-2">Condition Grade</label>
-                <select name="grade" value={formData.grade} onChange={handleChange} className="w-full border-2 border-gray-100 rounded-xl p-3 text-sm font-bold focus:border-[#D4AF37] outline-none bg-white">
-                  <option value="NEW">새상품</option><option value="S">S등급 (미세 사용감)</option><option value="A_PLUS">A+등급</option><option value="A">A등급 (보통 중고)</option>
+                <select name="grade" value={formData.grade} onChange={handleChange} className="w-full border-2 border-gray-100 rounded-xl p-3 text-sm font-bold focus:border-[#D4AF37] outline-none bg-white" disabled={formData.type === 'PARALLEL_IMPORT'}>
+                  <option value="NEW">새상품</option>
+                  <option value="S">S등급 (미세 사용감)</option>
+                  <option value="A_PLUS">A+등급</option>
+                  <option value="A">A등급 (보통 중고)</option>
                 </select>
+                {formData.type === 'PARALLEL_IMPORT' && <p className="text-[10px] text-[#D4AF37] mt-1 font-bold">* 병행수입은 자동으로 '새상품'으로 고정됩니다.</p>}
               </div>
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-2">Initial Status</label>
                 <select name="status" value={formData.status} onChange={handleChange} className="w-full border-2 border-gray-100 rounded-xl p-3 text-sm font-bold focus:border-[#D4AF37] outline-none bg-white">
-                  <option value="SELLING">판매 중 (스토어 노출)</option><option value="PREPARING">판매 준비 중 (비노출)</option>
+                  <option value="SELLING">판매 중 (스토어 노출)</option>
+                  <option value="PREPARING">판매 준비 중 (비노출)</option>
                 </select>
               </div>
             </div>

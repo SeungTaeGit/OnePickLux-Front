@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, ShoppingBag, User, LogOut, Menu, X, Heart, ChevronRight } from 'lucide-react';
+import { Search, ShoppingBag, User, LogOut, Menu, X, Heart, ChevronRight, Sparkles } from 'lucide-react'; // 💡 Sparkles 아이콘 추가
 
 const Header = () => {
   const navigate = useNavigate();
@@ -9,6 +9,7 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [cartCount, setCartCount] = useState(0);
+  const [likedCount, setLikedCount] = useState(0);
   const [activeTab, setActiveTab] = useState('category');
 
   const [brandSearch, setBrandSearch] = useState('');
@@ -39,27 +40,33 @@ const Header = () => {
     setBrandSearch('');
 
     if (loggedIn) {
-      fetchCartCount(token);
+      fetchCounts(token);
     } else {
       setCartCount(0);
+      setLikedCount(0);
     }
   }, [location.pathname]);
 
-  const fetchCartCount = async (token) => {
+  const fetchCounts = async (token) => {
     try {
-      const response = await fetch('http://localhost:8080/api/cart/count', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const cartRes = await fetch('http://localhost:8080/api/cart/count', {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
-      if (response.ok) {
-        const result = await response.json();
-        setCartCount(result.data);
+      if (cartRes.ok) {
+        const cartResult = await cartRes.json();
+        setCartCount(cartResult.data || 0);
+      }
+
+      const likedRes = await fetch('http://localhost:8080/api/products/likes/me', {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (likedRes.ok) {
+        const likedResult = await likedRes.json();
+        const likesArray = likedResult.data?.content || likedResult.data || [];
+        setLikedCount(likesArray.length);
       }
     } catch (error) {
-      console.error('장바구니 개수를 가져오는데 실패했습니다:', error);
+      console.error('카운트 정보를 가져오는데 실패했습니다:', error);
     }
   };
 
@@ -82,6 +89,7 @@ const Header = () => {
     localStorage.removeItem('accessToken');
     setIsLoggedIn(false);
     setCartCount(0);
+    setLikedCount(0);
     alert('로그아웃 되었습니다.');
     navigate('/');
   };
@@ -128,8 +136,18 @@ const Header = () => {
 
   const filteredBrands = brands.filter(b =>
     b.eng.toLowerCase().includes(brandSearch.toLowerCase()) ||
-    b.kor.includes(brandSearch)
+    b.kor?.includes(brandSearch)
   );
+
+  const requireLogin = (callback) => {
+    if (isLoggedIn) {
+      callback();
+    } else {
+      if (window.confirm('로그인이 필요한 서비스입니다. 로그인 페이지로 이동하시겠습니까?')) {
+        navigate('/login');
+      }
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/75 backdrop-blur-lg border-b border-[#E5E0D8] relative font-sans transition-colors duration-300 hover:bg-white/95">
@@ -158,6 +176,13 @@ const Header = () => {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#5C5550]">
+            {/* 💡 [추가] 병행수입 새상품관(부띠끄) 링크 - 골드 포인트 추가 */}
+            <Link to="/boutique" className="hover:text-[#D4AF37] transition flex items-center gap-1 font-bold text-[#2C2C2C]">
+              BOUTIQUE <Sparkles size={12} className="text-[#D4AF37]" />
+            </Link>
+
+            <span className="w-px h-3 bg-gray-300"></span> {/* 💡 메뉴 구분선 */}
+
             <Link to="/products?sort=new" className="hover:text-[#997B4D] transition">NEW</Link>
             <Link to="/products?sort=best" className="hover:text-[#997B4D] transition">BEST</Link>
             <Link to="/products?filter=sale" className="hover:text-[#997B4D] transition flex items-center gap-1">
@@ -170,9 +195,25 @@ const Header = () => {
           <button onClick={() => navigate('/selling')} className="hidden md:flex px-4 py-2 text-xs font-bold tracking-widest bg-[#997B4D] text-white rounded-full hover:bg-[#8B7355] transition shadow-sm">
             내 명품 팔기
           </button>
+
           <button className="hover:text-[#997B4D] transition"><Search size={20} strokeWidth={1.5} /></button>
 
-          <button onClick={() => navigate('/cart')} className="hover:text-[#997B4D] transition relative">
+          <button
+            onClick={() => requireLogin(() => navigate('/mypage', { state: { activeTab: 'likes' } }))}
+            className="hover:text-red-500 transition relative"
+          >
+            <Heart size={20} strokeWidth={1.5} />
+            {likedCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">
+                {likedCount > 99 ? '99+' : likedCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => requireLogin(() => navigate('/cart'))}
+            className="hover:text-[#997B4D] transition relative"
+          >
             <ShoppingBag size={20} strokeWidth={1.5} />
             {cartCount > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#997B4D] text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">
@@ -186,28 +227,25 @@ const Header = () => {
               <button onClick={() => navigate('/mypage')} className="flex items-center gap-1.5 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase">
                 <User size={16} /> MY PAGE
               </button>
-              <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase">
+              <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs font-bold tracking-widest hover:text-red-500 transition uppercase text-gray-400">
                 <LogOut size={16} /> LOGOUT
               </button>
             </div>
           ) : (
-            <button onClick={() => navigate('/login')} className="flex items-center gap-2 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase">
-              <User size={16} /> LOGIN
-            </button>
+            <div className="flex items-center ml-2 border-l border-[#E5E0D8] pl-4">
+              <button onClick={() => navigate('/login')} className="flex items-center gap-2 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase">
+                <User size={16} /> LOGIN
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* 💡 [핵심 수정] 드롭다운 컨테이너에 스크롤바 숨김 Tailwind 클래스 추가
-          [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
-          이 클래스들이 화면에서 스크롤바 영역을 없애주어 밀림 현상을 방지합니다. */}
       <div
         className={`fixed top-20 left-0 w-full h-[calc(100vh-5rem)] bg-white z-40 border-t border-[#E5E0D8] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transform transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] origin-top
           ${isMenuOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-4 pointer-events-none'}`}
       >
         <div className="max-w-7xl mx-auto h-full flex flex-col md:flex-row px-4 sm:px-6 lg:px-8">
-
-          {/* 좌측 탭 메뉴 */}
           <div className="w-full md:w-64 py-12 pr-0 md:pr-10 flex flex-row md:flex-col gap-8 border-b md:border-b-0 md:border-r border-[#E5E0D8]">
             <button
               onClick={() => setActiveTab('category')}
@@ -225,15 +263,10 @@ const Header = () => {
             </button>
           </div>
 
-          {/* 우측 메인 콘텐츠 영역 */}
           <div className="flex-1 py-12 pl-0 md:pl-16">
-
             {activeTab === 'brand' && (
               <div className="animate-fade-in space-y-12">
-
-                {/* 상단 관심/인기 브랜드 박스 영역 */}
                 <div className="flex flex-col xl:flex-row gap-6">
-                  {/* 관심 브랜드 박스 */}
                   <div className="flex-1 bg-[#F9F9F9] p-8 rounded-sm">
                     <h3 className="text-sm font-bold text-[#2C2C2C] mb-6">관심 브랜드</h3>
                     {likedBrandsList.length > 0 ? (
@@ -253,7 +286,6 @@ const Header = () => {
                     )}
                   </div>
 
-                  {/* 인기 브랜드 박스 */}
                   <div className="flex-1 bg-[#F9F9F9] p-8 rounded-sm">
                     <h3 className="text-sm font-bold text-[#2C2C2C] mb-6">인기 브랜드</h3>
                     <div className="flex flex-wrap gap-2">
@@ -269,7 +301,6 @@ const Header = () => {
                   </div>
                 </div>
 
-                {/* 검색창 */}
                 <div className="relative max-w-md">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input
@@ -281,22 +312,15 @@ const Header = () => {
                   />
                 </div>
 
-                {/* 브랜드 리스트 */}
                 <div>
                   <div className="flex items-center gap-4 border-b border-[#E5E0D8] pb-4 mb-6 text-sm font-bold text-[#2C2C2C]">
-                    <span>A-Z</span>
-                    <span className="text-gray-300">|</span>
-                    <span className="text-gray-400 font-normal">ㄱ-ㅎ</span>
+                    <span>A-Z</span><span className="text-gray-300">|</span><span className="text-gray-400 font-normal">ㄱ-ㅎ</span>
                   </div>
-
                   {filteredBrands.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-y-6 gap-x-12">
                       {filteredBrands.map(brand => (
                         <div key={`list-${brand.slug}`} className="flex items-center justify-between group py-2">
-                          <button
-                            onClick={() => { setIsMenuOpen(false); navigate(`/brand/${brand.slug}`); }}
-                            className="flex flex-col text-left"
-                          >
+                          <button onClick={() => { setIsMenuOpen(false); navigate(`/brand/${brand.slug}`); }} className="flex flex-col text-left">
                             <span className="text-base font-bold text-[#1A1A1A] group-hover:text-[#997B4D] transition-colors">{brand.eng}</span>
                             <span className="text-xs text-gray-500 mt-1">{brand.kor}</span>
                           </button>
@@ -306,11 +330,8 @@ const Header = () => {
                         </div>
                       ))}
                     </div>
-                  ) : (
-                     <div className="py-10 text-center text-gray-400 text-sm">검색된 브랜드가 없습니다.</div>
-                  )}
+                  ) : (<div className="py-10 text-center text-gray-400 text-sm">검색된 브랜드가 없습니다.</div>)}
                 </div>
-
               </div>
             )}
 
@@ -342,10 +363,7 @@ const Header = () => {
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-y-6 gap-x-12">
                     {categories.map(cat => (
                       <div key={`list-cat-${cat.id}`} className="flex items-center justify-between group py-2 border-b border-transparent hover:border-gray-100">
-                        <button
-                          onClick={() => { setIsMenuOpen(false); navigate(`/products?categoryId=${cat.id}`); }}
-                          className="text-base font-medium text-[#2C2C2C] group-hover:text-[#997B4D] transition-colors"
-                        >
+                        <button onClick={() => { setIsMenuOpen(false); navigate(`/products?categoryId=${cat.id}`); }} className="text-base font-medium text-[#2C2C2C] group-hover:text-[#997B4D] transition-colors">
                           {cat.name}
                         </button>
                         <button onClick={() => toggleLikeCategory(cat.id)} className="p-2">
@@ -357,7 +375,6 @@ const Header = () => {
                 </div>
               </div>
             )}
-
           </div>
         </div>
       </div>

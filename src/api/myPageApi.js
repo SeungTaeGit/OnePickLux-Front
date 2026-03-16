@@ -1,4 +1,5 @@
 import client from './client.js';
+import axios from 'axios';
 
 export const getMyProfile = async () => {
   try {
@@ -28,4 +29,14 @@ export const getMyOrderHistory = async () => {
     console.error('구매 내역 조회 실패:', error);
     throw error;
   }
+};
+
+export const getMyLikedProducts = async () => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) throw new Error("토큰이 없습니다.");
+
+  const response = await axios.get('http://localhost:8080/api/products/likes/me', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
 };

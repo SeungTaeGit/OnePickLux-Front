@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom'; // 💡 페이지 이동을 위해 추가
+import { useNavigate } from 'react-router-dom';
 import { Search, Filter, Calendar, TrendingDown, Edit, Trash2, X, Save, Upload, Image as ImageIcon } from 'lucide-react';
 import axios from 'axios';
 
 const AdminProducts = () => {
-  const navigate = useNavigate(); // 💡 네비게이션 훅 초기화
+  const navigate = useNavigate();
 
   const [products, setProducts] = useState([]);
   const [brandList, setBrandList] = useState([]);
@@ -19,6 +19,7 @@ const AdminProducts = () => {
 
   const [editForm, setEditForm] = useState({
     brandId: '', categoryId: '', name: '', price: 0, discountRate: 0,
+    type: 'PRE_OWNED', // 💡 [추가] 수정 폼에도 타입 필드 추가
     status: 'SELLING', description: '', grade: 'S'
   });
 
@@ -40,7 +41,6 @@ const AdminProducts = () => {
       const response = await axios.get('http://localhost:8080/api/admin/products', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // 백엔드가 Page 객체로 줬다면 response.data.data.content 일 수 있으니 방어
       const content = response.data?.data?.content || response.data?.data || [];
       setProducts(content);
     } catch (error) {
@@ -58,7 +58,6 @@ const AdminProducts = () => {
       let allBrands = Array.isArray(brandRes.data?.data) ? brandRes.data.data : (Array.isArray(brandRes.data) ? brandRes.data : []);
       setBrandList(allBrands);
 
-      // 카테고리 임시 하드코딩
       setCategoryList([
         { id: 1, name: "가방" }, { id: 2, name: "의류" }, { id: 3, name: "주얼리" },
         { id: 4, name: "신발" }, { id: 5, name: "지갑" }, { id: 6, name: "악세서리" }
@@ -68,10 +67,8 @@ const AdminProducts = () => {
     }
   };
 
-  // 💡 [개선] Spring Boot의 날짜 형식을 안전하게 파싱하는 헬퍼 함수
   const parseDate = (dateData) => {
     if (!dateData) return null;
-    // 만약 백엔드에서 배열 [2024, 3, 12, 10, 30] 형태로 온다면 조립
     if (Array.isArray(dateData)) {
       return new Date(dateData[0], dateData[1] - 1, dateData[2], dateData[3] || 0, dateData[4] || 0);
     }
@@ -122,12 +119,19 @@ const AdminProducts = () => {
   const handleEditClick = (product) => {
     setSelectedItem(product);
 
+    // 💡 [추가] 백엔드에서 type 정보를 보내줄 경우를 대비한 방어적 세팅
+    let currentType = product.type;
+    if (!currentType) {
+      currentType = product.typeDescription === '병행수입(새상품)' ? 'PARALLEL_IMPORT' : 'PRE_OWNED';
+    }
+
     setEditForm({
       brandId: product.brandId || brandList.find(b => b.name === product.brandName)?.id || 1,
       categoryId: product.categoryId || 1,
       name: product.name,
       price: product.price,
       discountRate: product.discountRate || product.discount || 0,
+      type: currentType, // 💡 수정할 때 기존 타입 세팅
       status: product.status === '판매중' ? 'SELLING' : (product.status === '예약중' ? 'RESERVED' : (product.status === '품절' ? 'SOLD_OUT' : 'PREPARING')),
       grade: product.grade || 'S',
       description: product.description || ''
@@ -239,16 +243,18 @@ const AdminProducts = () => {
                 const parsedDate = parseDate(p.createdAt || p.registeredAt);
                 const actualProductId = p.productId || p.id;
 
+                // 💡 [UX] 상품 리스트에서도 이게 부띠끄(새상품)인지 알 수 있도록 배지 처리
+                const isBoutique = p.type === 'PARALLEL_IMPORT' || p.typeDescription === '병행수입(새상품)';
+
                 return (
-                  // 💡 [수정] 행을 클릭하면 상세 페이지로 이동하도록 onClick 및 cursor-pointer 추가
                   <tr
                     key={actualProductId}
                     onClick={() => navigate(`/products/${actualProductId}`)}
                     className="hover:bg-gray-50 transition-colors group cursor-pointer"
                   >
                     <td className="p-4 w-24">
-                       <div className="w-16 h-16 rounded overflow-hidden bg-gray-100 border">
-                         {/* 💡 백엔드에서 thumbnailUrl을 내려주면 여기서 보입니다 */}
+                       <div className="w-16 h-16 rounded overflow-hidden bg-gray-100 border relative">
+                         {isBoutique && <div className="absolute top-0 left-0 bg-[#D4AF37] text-white text-[8px] px-1 font-bold z-10">NEW</div>}
                          {p.thumbnailUrl || p.image ? (
                            <img src={getImageUrl(p.thumbnailUrl || p.image)} alt={p.name} className="w-full h-full object-cover" />
                          ) : (
@@ -271,7 +277,6 @@ const AdminProducts = () => {
                       ) : (<div className="font-serif font-bold text-black text-base">₩ {p.price?.toLocaleString()}</div>)}
                     </td>
                     <td className="p-4">
-                      {/* 💡 백엔드에서 createdAt을 내려주면 날짜가 정상 표기됩니다 */}
                       <p className="text-[10px] text-gray-400 font-mono mb-2">
                         {parsedDate ? parsedDate.toLocaleDateString() : 'N/A'}
                       </p>
@@ -280,7 +285,6 @@ const AdminProducts = () => {
                       </span>
                     </td>
                     <td className="p-6 flex justify-end gap-2 pt-6">
-                      {/* 💡 [수정] 수정/삭제 버튼 클릭 시 상세 페이지 이동 이벤트가 발생하지 않도록 e.stopPropagation() 추가 */}
                       <button
                         onClick={(e) => { e.stopPropagation(); handleEditClick(p); }}
                         className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-black hover:text-[#D4AF37] transition-all"
@@ -302,7 +306,7 @@ const AdminProducts = () => {
         </table>
       </div>
 
-      {/* 수정 모달 (이하 코드 동일) */}
+      {/* 수정 모달 */}
       {isEditModalOpen && selectedItem && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 overflow-y-auto">
           <div className="bg-white w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 my-8 max-h-[90vh] flex flex-col">
@@ -378,6 +382,24 @@ const AdminProducts = () => {
                     <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Product Name</label>
                     <input type="text" value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})} className="w-full border border-gray-200 rounded-xl p-3 text-sm font-bold focus:border-[#D4AF37] outline-none" required />
                   </div>
+
+                  {/* 💡 [추가] 수정 모달에도 상품 타입 선택 추가 */}
+                  <div className="bg-white p-4 rounded-xl border border-gray-200">
+                    <label className="block text-[10px] font-black text-[#D4AF37] uppercase mb-2">Product Type (상품 유형)</label>
+                    <select
+                      value={editForm.type}
+                      onChange={(e) => {
+                        const newType = e.target.value;
+                        // 새상품을 고르면 등급을 NEW로 자동 고정해줍니다.
+                        setEditForm({...editForm, type: newType, grade: newType === 'PARALLEL_IMPORT' ? 'NEW' : editForm.grade});
+                      }}
+                      className="w-full border border-gray-200 rounded-xl p-3 text-sm font-bold focus:border-[#D4AF37] outline-none"
+                    >
+                      <option value="PRE_OWNED">일반 중고 명품 (Pre-owned)</option>
+                      <option value="PARALLEL_IMPORT">병행수입 새상품 (Boutique)</option>
+                    </select>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Base Price (원)</label>
@@ -391,7 +413,12 @@ const AdminProducts = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Grade</label>
-                      <select value={editForm.grade} onChange={(e) => setEditForm({...editForm, grade: e.target.value})} className="w-full border border-gray-200 rounded-xl p-3 text-sm font-bold focus:border-[#D4AF37] outline-none">
+                      <select
+                        value={editForm.grade}
+                        onChange={(e) => setEditForm({...editForm, grade: e.target.value})}
+                        className="w-full border border-gray-200 rounded-xl p-3 text-sm font-bold focus:border-[#D4AF37] outline-none"
+                        disabled={editForm.type === 'PARALLEL_IMPORT'} // 병행수입은 수정 불가
+                      >
                         <option value="NEW">새상품</option><option value="S">S등급</option><option value="A_PLUS">A+등급</option><option value="A">A등급</option>
                       </select>
                     </div>

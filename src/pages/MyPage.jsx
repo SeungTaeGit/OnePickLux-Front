@@ -1,38 +1,60 @@
 import React, { useState, useEffect } from 'react';
-import { User, Package, Tag, LogOut, ChevronRight } from 'lucide-react';
-import { getMyProfile, getMySellingHistory, getMyOrderHistory } from '../api/myPageApi.js';
-import { useNavigate } from 'react-router-dom';
+import { User, Package, Tag, Heart, ChevronRight } from 'lucide-react';
+import { getMyProfile, getMySellingHistory, getMyOrderHistory, getMyLikedProducts } from '../api/myPageApi.js';
+import { useNavigate, useLocation } from 'react-router-dom';
+import ProductCard from '../components/common/ProductCard.jsx';
 
 const MyPage = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('profile');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'profile');
 
-  // 상태 관리
   const [profile, setProfile] = useState(null);
   const [sellingList, setSellingList] = useState([]);
   const [orderList, setOrderList] = useState([]);
+  const [likedList, setLikedList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 화면이 처음 켜질 때 데이터 불러오기
   useEffect(() => {
     const fetchMyPageData = async () => {
       try {
         setIsLoading(true);
-        // 세 가지 API를 동시에 병렬로 호출 (성능 최적화)
-        const [profileRes, sellingRes, orderRes] = await Promise.all([
-          getMyProfile(),
-          getMySellingHistory(),
-          getMyOrderHistory()
+        console.log("🔄 마이페이지 데이터 로딩 시작...");
+
+        // 💡 4개의 API를 병렬 호출하며, 하나라도 에러가 나면 앱이 멈추지 않도록 각각 catch를 달아줍니다.
+        const [profileRes, sellingRes, orderRes, likedRes] = await Promise.all([
+          getMyProfile().catch(e => { console.error("프로필 에러:", e); return null; }),
+          getMySellingHistory().catch(e => { console.error("판매내역 에러:", e); return null; }),
+          getMyOrderHistory().catch(e => { console.error("구매내역 에러:", e); return null; }),
+          getMyLikedProducts().catch(e => {
+            console.error("🚨 찜한 상품 API 에러:", e);
+            return { status: 'ERROR', data: [] };
+          })
         ]);
 
-        if (profileRes.status === 'OK') setProfile(profileRes.data);
-        if (sellingRes.status === 'OK') setSellingList(sellingRes.data);
-        if (orderRes.status === 'OK') setOrderList(orderRes.data);
+        if (profileRes && profileRes.status === 'OK') setProfile(profileRes.data);
+        if (sellingRes && sellingRes.status === 'OK') setSellingList(sellingRes.data);
+        if (orderRes && orderRes.status === 'OK') setOrderList(orderRes.data);
+
+        // 💡 Axios 래핑을 벗겨내는 강력한 방어 로직
+        console.log("📦 찜한 상품 백엔드 응답 데이터:", likedRes);
+        let likesArray = [];
+        if (likedRes) {
+          if (likedRes.data && Array.isArray(likedRes.data)) {
+            likesArray = likedRes.data;
+          } else if (likedRes.data?.data && Array.isArray(likedRes.data.data)) {
+            likesArray = likedRes.data.data;
+          } else if (Array.isArray(likedRes)) {
+            likesArray = likedRes;
+          }
+        }
+
+        console.log("🎯 최종 렌더링될 찜 상품 개수:", likesArray.length);
+        setLikedList(likesArray);
 
       } catch (error) {
-        console.error("데이터를 불러오는데 실패했습니다.", error);
-        // 토큰이 만료되었거나 없으면 로그인 페이지로 튕겨냄
-        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        console.error("데이터 전체 로드 실패:", error);
+        alert('세션이 만료되었습니다. 다시 로그인해주세요.');
         navigate('/login');
       } finally {
         setIsLoading(false);
@@ -47,23 +69,20 @@ const MyPage = () => {
   }
 
   return (
-    <div className="bg-[#FDFBF7] min-h-screen pb-20 animate-fade-in">
-      {/* 상단 헤더 영역 */}
+    <div className="bg-[#FDFBF7] min-h-screen pb-20 animate-fade-in font-sans">
       <div className="bg-[#2C2C2C] text-white py-16 px-4">
         <div className="max-w-7xl mx-auto flex items-center gap-6">
           <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center">
             <User size={32} className="text-[#D4AF37]" />
           </div>
           <div>
-            <h2 className="text-3xl font-serif mb-2"><span className="text-[#D4AF37]">{profile?.name}</span> 님</h2>
+            <h2 className="text-3xl font-serif mb-2"><span className="text-[#D4AF37]">{profile?.name || '고객'}</span> 님</h2>
             <p className="text-sm font-light text-gray-400">{profile?.email}</p>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 mt-12 flex flex-col md:flex-row gap-8">
-
-        {/* 좌측 탭 메뉴 */}
         <aside className="w-full md:w-64 flex-shrink-0">
           <div className="bg-white border border-[#E5E0D8] rounded-sm overflow-hidden shadow-sm">
             <button
@@ -82,18 +101,22 @@ const MyPage = () => {
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className={`w-full flex items-center justify-between p-5 text-sm font-bold tracking-widest transition ${activeTab === 'orders' ? 'bg-[#FDFBF7] text-[#997B4D]' : 'text-[#5C5550] hover:bg-gray-50'}`}
+              className={`w-full flex items-center justify-between p-5 text-sm font-bold tracking-widest transition border-b border-[#E5E0D8] ${activeTab === 'orders' ? 'bg-[#FDFBF7] text-[#997B4D]' : 'text-[#5C5550] hover:bg-gray-50'}`}
             >
               <div className="flex items-center gap-3"><Package size={16} /> 구매 내역 <span className="bg-[#997B4D] text-white text-[10px] px-2 py-0.5 rounded-full">{orderList.length}</span></div>
+              <ChevronRight size={14} />
+            </button>
+            <button
+              onClick={() => setActiveTab('likes')}
+              className={`w-full flex items-center justify-between p-5 text-sm font-bold tracking-widest transition ${activeTab === 'likes' ? 'bg-[#FDFBF7] text-[#997B4D]' : 'text-[#5C5550] hover:bg-gray-50'}`}
+            >
+              <div className="flex items-center gap-3"><Heart size={16} /> 찜한 상품 <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{likedList.length}</span></div>
               <ChevronRight size={14} />
             </button>
           </div>
         </aside>
 
-        {/* 우측 콘텐츠 영역 */}
-        <main className="flex-1 bg-white border border-[#E5E0D8] shadow-sm p-8 md:p-12">
-
-          {/* 1. 내 정보 관리 탭 */}
+        <main className="flex-1 bg-white border border-[#E5E0D8] shadow-sm p-8 md:p-12 min-h-[500px]">
           {activeTab === 'profile' && (
             <div className="animate-fade-in">
               <h3 className="text-xl font-serif text-[#2C2C2C] mb-6 pb-4 border-b border-[#E5E0D8]">Profile Information</h3>
@@ -107,7 +130,6 @@ const MyPage = () => {
             </div>
           )}
 
-          {/* 2. 판매 내역 탭 */}
           {activeTab === 'selling' && (
             <div className="animate-fade-in">
               <h3 className="text-xl font-serif text-[#2C2C2C] mb-6 pb-4 border-b border-[#E5E0D8]">Selling History</h3>
@@ -140,7 +162,6 @@ const MyPage = () => {
             </div>
           )}
 
-          {/* 3. 구매 내역 탭 */}
           {activeTab === 'orders' && (
             <div className="animate-fade-in">
               <h3 className="text-xl font-serif text-[#2C2C2C] mb-6 pb-4 border-b border-[#E5E0D8]">Order History</h3>
@@ -148,12 +169,45 @@ const MyPage = () => {
                 <div className="text-center py-16 text-[#888] bg-[#FDFBF7] border border-[#E5E0D8]">결제 완료된 주문 내역이 없습니다.</div>
               ) : (
                 <div className="space-y-4">
-                  {/* 나중에 결제 기능 만들면 이곳에 리스트가 나옵니다. */}
+                  {/* 구매 내역 렌더링 영역 */}
                 </div>
               )}
             </div>
           )}
 
+          {activeTab === 'likes' && (
+            <div className="animate-fade-in">
+              <h3 className="text-xl font-serif text-[#2C2C2C] mb-6 pb-4 border-b border-[#E5E0D8] flex items-center justify-between">
+                Wishlist
+                <span className="text-sm text-[#888] font-sans">총 <span className="font-bold text-[#D4AF37]">{likedList.length}</span>개의 상품</span>
+              </h3>
+
+              {likedList.length === 0 ? (
+                <div className="text-center py-20 text-[#888] bg-[#FDFBF7] border border-[#E5E0D8] flex flex-col items-center justify-center">
+                  <Heart size={40} className="text-[#E5E0D8] mb-4" strokeWidth={1.5} />
+                  <p className="font-bold text-[#5C5550] mb-2">찜한 상품이 없습니다.</p>
+                  <p className="text-sm">마음에 드는 상품에 하트를 눌러보세요.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                  {likedList.map((product) => (
+                    <ProductCard
+                        key={product.productId}
+                        product={{
+                            ...product,
+                            image: product.thumbnailUrl || "IMG",
+                            brand: product.brandName,
+                            name: product.name,
+                            price: product.price,
+                            discountRate: product.discountRate,
+                            isLiked: true
+                        }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </main>
       </div>
     </div>
