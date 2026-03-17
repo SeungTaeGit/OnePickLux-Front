@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, ShoppingBag, User, LogOut, Menu, X, Heart, ChevronRight, Sparkles } from 'lucide-react'; // 💡 Sparkles 아이콘 추가
+import { Search, ShoppingBag, User, LogOut, Menu, X, Heart, ChevronRight, Sparkles } from 'lucide-react';
+import axios from 'axios'; // 💡 API 호출을 위해 axios 추가
 
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const [cartCount, setCartCount] = useState(0);
   const [likedCount, setLikedCount] = useState(0);
   const [activeTab, setActiveTab] = useState('category');
 
   const [brandSearch, setBrandSearch] = useState('');
+  const [globalSearchKeyword, setGlobalSearchKeyword] = useState('');
+
+  // 💡 [핵심 수정 1] 하드코딩된 브랜드를 지우고, DB에서 가져올 상태(State)로 변경합니다.
+  const [brands, setBrands] = useState([]);
 
   const [likedCategories, setLikedCategories] = useState(() => {
     const saved = localStorage.getItem('likedCategories');
@@ -32,12 +38,37 @@ const Header = () => {
     localStorage.setItem('likedBrands', JSON.stringify(likedBrands));
   }, [likedBrands]);
 
+  // 💡 [핵심 수정 2] 헤더가 렌더링될 때 DB에서 활성화된 브랜드를 싹 가져옵니다.
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/api/brands/active');
+        const rawBrands = response.data?.data || response.data || [];
+
+        // 기존 컴포넌트 로직과 호환되도록 eng, kor, slug 필드를 예쁘게 가공합니다.
+        const formattedBrands = rawBrands.map(b => ({
+          id: b.id || b.brandId,
+          eng: b.englishName,
+          kor: b.koreanName,
+          slug: b.englishName.toLowerCase().replace(/\s+/g, '-')
+        }));
+
+        setBrands(formattedBrands);
+      } catch (error) {
+        console.error('헤더 브랜드 로딩 실패:', error);
+      }
+    };
+    fetchBrands();
+  }, []);
+
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     const loggedIn = !!token;
     setIsLoggedIn(loggedIn);
     setIsMenuOpen(false);
+    setIsSearchOpen(false);
     setBrandSearch('');
+    setGlobalSearchKeyword('');
 
     if (loggedIn) {
       fetchCounts(token);
@@ -71,7 +102,7 @@ const Header = () => {
   };
 
   useEffect(() => {
-    if (isMenuOpen) {
+    if (isMenuOpen || isSearchOpen) {
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
       document.body.style.paddingRight = `${scrollbarWidth}px`;
@@ -83,7 +114,7 @@ const Header = () => {
       document.body.style.overflow = 'unset';
       document.body.style.paddingRight = '0px';
     };
-  }, [isMenuOpen]);
+  }, [isMenuOpen, isSearchOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
@@ -99,25 +130,10 @@ const Header = () => {
     { id: 4, name: '신발' }, { id: 5, name: '지갑' }, { id: 6, name: '악세서리' }
   ];
 
-  const brands = [
-    { eng: 'CHANEL', kor: '샤넬', slug: 'chanel' },
-    { eng: 'HERMES', kor: '에르메스', slug: 'hermes' },
-    { eng: 'ROLEX', kor: '롤렉스', slug: 'rolex' },
-    { eng: 'LOUIS VUITTON', kor: '루이비통', slug: 'louis-vuitton' },
-    { eng: 'DIOR', kor: '디올', slug: 'dior' },
-    { eng: 'GUCCI', kor: '구찌', slug: 'gucci' },
-    { eng: 'PRADA', kor: '프라다', slug: 'prada' },
-    { eng: 'CELINE', kor: '셀린느', slug: 'celine' },
-    { eng: 'CARTIER', kor: '까르띠에', slug: 'cartier' },
-    { eng: 'GOYARD', kor: '고야드', slug: 'goyard' }
-  ];
-
-  const popularBrands = [
-    brands.find(b => b.eng === 'CHANEL'),
-    brands.find(b => b.eng === 'HERMES'),
-    brands.find(b => b.eng === 'ROLEX'),
-    brands.find(b => b.eng === 'DIOR')
-  ].filter(Boolean);
+  // 💡 [핵심 수정 3] 하드코딩 제거! DB에서 가져온 brands 상태를 활용합니다.
+  const popularBrands = brands.filter(b =>
+    ['CHANEL', 'HERMES', 'ROLEX', 'DIOR'].includes(b.eng?.toUpperCase())
+  ).slice(0, 4);
 
   const toggleLikeCategory = (categoryId) => {
     setLikedCategories(prev =>
@@ -135,7 +151,7 @@ const Header = () => {
   const likedBrandsList = brands.filter(b => likedBrands.includes(b.slug));
 
   const filteredBrands = brands.filter(b =>
-    b.eng.toLowerCase().includes(brandSearch.toLowerCase()) ||
+    b.eng?.toLowerCase().includes(brandSearch.toLowerCase()) ||
     b.kor?.includes(brandSearch)
   );
 
@@ -149,13 +165,27 @@ const Header = () => {
     }
   };
 
+  const executeSearch = (keyword) => {
+    if (!keyword.trim()) return;
+    setIsSearchOpen(false);
+    navigate(`/products?keyword=${encodeURIComponent(keyword)}`);
+  };
+
+  // 💡 [프론트엔드 꿀팁] 브랜드관으로 이동할 때, DB의 찐짜 ID를 state에 숨겨서 보냅니다!
+  const navigateToBrand = (brand) => {
+    setIsMenuOpen(false);
+    navigate(`/brand/${brand.slug}`, {
+      state: { brandId: brand.id, brandName: brand.eng } // 브랜드관에서 이 아이디를 꺼내 쓸 수 있습니다!
+    });
+  };
+
   return (
     <header className="sticky top-0 z-50 bg-white/75 backdrop-blur-lg border-b border-[#E5E0D8] relative font-sans transition-colors duration-300 hover:bg-white/95">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative z-20">
 
         <div className="flex items-center gap-6 md:gap-10">
           <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onClick={() => { setIsMenuOpen(!isMenuOpen); setIsSearchOpen(false); }}
             className="text-[#2C2C2C] hover:text-[#997B4D] transition flex items-center justify-center relative w-8 h-8"
           >
             <div className={`absolute transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isMenuOpen ? 'rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100'}`}>
@@ -176,12 +206,17 @@ const Header = () => {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#5C5550]">
-            {/* 💡 [추가] 병행수입 새상품관(부띠끄) 링크 - 골드 포인트 추가 */}
             <Link to="/boutique" className="hover:text-[#D4AF37] transition flex items-center gap-1 font-bold text-[#2C2C2C]">
               BOUTIQUE <Sparkles size={12} className="text-[#D4AF37]" />
             </Link>
+            <span className="w-px h-3 bg-gray-300"></span>
 
-            <span className="w-px h-3 bg-gray-300"></span> {/* 💡 메뉴 구분선 */}
+            <button
+              onClick={() => { setIsMenuOpen(true); setActiveTab('brand'); }}
+              className="hover:text-[#997B4D] transition font-bold"
+            >
+              BRANDS
+            </button>
 
             <Link to="/products?sort=new" className="hover:text-[#997B4D] transition">NEW</Link>
             <Link to="/products?sort=best" className="hover:text-[#997B4D] transition">BEST</Link>
@@ -196,50 +231,76 @@ const Header = () => {
             내 명품 팔기
           </button>
 
-          <button className="hover:text-[#997B4D] transition"><Search size={20} strokeWidth={1.5} /></button>
-
           <button
-            onClick={() => requireLogin(() => navigate('/mypage', { state: { activeTab: 'likes' } }))}
-            className="hover:text-red-500 transition relative"
+            onClick={() => { setIsSearchOpen(!isSearchOpen); setIsMenuOpen(false); }}
+            className={`transition ${isSearchOpen ? 'text-[#D4AF37]' : 'hover:text-[#997B4D]'}`}
           >
-            <Heart size={20} strokeWidth={1.5} />
-            {likedCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">
-                {likedCount > 99 ? '99+' : likedCount}
-              </span>
-            )}
+            {isSearchOpen ? <X size={20} strokeWidth={1.5} /> : <Search size={20} strokeWidth={1.5} />}
           </button>
 
-          <button
-            onClick={() => requireLogin(() => navigate('/cart'))}
-            className="hover:text-[#997B4D] transition relative"
-          >
+          <button onClick={() => requireLogin(() => navigate('/mypage', { state: { activeTab: 'likes' } }))} className="hover:text-red-500 transition relative">
+            <Heart size={20} strokeWidth={1.5} />
+            {likedCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">{likedCount > 99 ? '99+' : likedCount}</span>}
+          </button>
+
+          <button onClick={() => requireLogin(() => navigate('/cart'))} className="hover:text-[#997B4D] transition relative">
             <ShoppingBag size={20} strokeWidth={1.5} />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#997B4D] text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">
-                {cartCount > 99 ? '99+' : cartCount}
-              </span>
-            )}
+            {cartCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#997B4D] text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">{cartCount > 99 ? '99+' : cartCount}</span>}
           </button>
 
           {isLoggedIn ? (
             <div className="flex items-center gap-4 ml-2 border-l border-[#E5E0D8] pl-4">
-              <button onClick={() => navigate('/mypage')} className="flex items-center gap-1.5 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase">
-                <User size={16} /> MY PAGE
-              </button>
-              <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs font-bold tracking-widest hover:text-red-500 transition uppercase text-gray-400">
-                <LogOut size={16} /> LOGOUT
-              </button>
+              <button onClick={() => navigate('/mypage')} className="flex items-center gap-1.5 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase"><User size={16} /> MY PAGE</button>
+              <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs font-bold tracking-widest hover:text-red-500 transition uppercase text-gray-400"><LogOut size={16} /> LOGOUT</button>
             </div>
           ) : (
             <div className="flex items-center ml-2 border-l border-[#E5E0D8] pl-4">
-              <button onClick={() => navigate('/login')} className="flex items-center gap-2 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase">
-                <User size={16} /> LOGIN
-              </button>
+              <button onClick={() => navigate('/login')} className="flex items-center gap-2 text-xs font-bold tracking-widest hover:text-[#997B4D] transition uppercase"><User size={16} /> LOGIN</button>
             </div>
           )}
         </div>
       </div>
+
+      <div
+        className={`absolute top-20 left-0 w-full bg-white border-b border-[#E5E0D8] shadow-2xl transition-all duration-300 origin-top z-10
+          ${isSearchOpen ? 'opacity-100 scale-y-100 pointer-events-auto' : 'opacity-0 scale-y-0 pointer-events-none'}`}
+      >
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <div className="relative">
+            <input
+              type="text"
+              value={globalSearchKeyword}
+              onChange={(e) => setGlobalSearchKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && executeSearch(globalSearchKeyword)}
+              placeholder="찾으시는 브랜드나 상품명을 입력해주세요."
+              className="w-full text-2xl md:text-3xl font-light text-[#2C2C2C] border-b-2 border-[#E5E0D8] focus:border-[#D4AF37] pb-4 bg-transparent outline-none placeholder:text-gray-300 transition-colors pr-12"
+              autoFocus={isSearchOpen}
+            />
+            <button
+              onClick={() => executeSearch(globalSearchKeyword)}
+              className="absolute right-2 top-2 text-[#2C2C2C] hover:text-[#D4AF37] transition"
+            >
+              <Search size={32} strokeWidth={1} />
+            </button>
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">인기 검색어</span>
+            {['샤넬 클래식', '롤렉스 서브마리너', '에르메스 버킨', '구찌 마몽', '디올 레이디백'].map((tag) => (
+              <button
+                key={tag}
+                onClick={() => executeSearch(tag)}
+                className="px-4 py-2 bg-[#F9F9F9] border border-[#E5E0D8] rounded-full text-xs font-bold text-[#5C5550] hover:bg-[#1A1A1A] hover:text-[#D4AF37] hover:border-[#1A1A1A] transition-all"
+              >
+                # {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {isSearchOpen && (
+        <div className="fixed top-20 left-0 w-full h-screen bg-black/40 backdrop-blur-sm z-0" onClick={() => setIsSearchOpen(false)}></div>
+      )}
 
       <div
         className={`fixed top-20 left-0 w-full h-[calc(100vh-5rem)] bg-white z-40 border-t border-[#E5E0D8] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transform transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] origin-top
@@ -273,7 +334,8 @@ const Header = () => {
                       <div className="flex flex-wrap gap-2">
                         {likedBrandsList.map(brand => (
                           <div key={`liked-${brand.slug}`} className="flex items-center gap-1 bg-white border border-[#E5E0D8] px-4 py-2 rounded-full shadow-sm hover:border-[#997B4D] transition-colors">
-                            <button onClick={() => { setIsMenuOpen(false); navigate(`/brand/${brand.slug}`); }} className="text-xs font-bold text-[#5C5550]">{brand.kor}</button>
+                            {/* 💡 [핵심 수정 4] navigateToBrand 호출! */}
+                            <button onClick={() => navigateToBrand(brand)} className="text-xs font-bold text-[#5C5550]">{brand.kor}</button>
                             <button onClick={() => toggleLikeBrand(brand.slug)} className="ml-1"><Heart size={14} className="fill-[#997B4D] text-[#997B4D]"/></button>
                           </div>
                         ))}
@@ -291,7 +353,7 @@ const Header = () => {
                     <div className="flex flex-wrap gap-2">
                       {popularBrands.map(brand => (
                         <div key={`pop-${brand.slug}`} className="flex items-center gap-1 bg-white border border-[#E5E0D8] px-4 py-2 rounded-full shadow-sm hover:border-[#997B4D] transition-colors">
-                          <button onClick={() => { setIsMenuOpen(false); navigate(`/brand/${brand.slug}`); }} className="text-xs font-bold text-[#5C5550]">{brand.kor}</button>
+                          <button onClick={() => navigateToBrand(brand)} className="text-xs font-bold text-[#5C5550]">{brand.kor}</button>
                           <button onClick={() => toggleLikeBrand(brand.slug)} className="ml-1">
                             <Heart size={14} className={likedBrands.includes(brand.slug) ? "fill-[#997B4D] text-[#997B4D]" : "text-gray-300 hover:text-[#997B4D]"} />
                           </button>
@@ -320,7 +382,7 @@ const Header = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-y-6 gap-x-12">
                       {filteredBrands.map(brand => (
                         <div key={`list-${brand.slug}`} className="flex items-center justify-between group py-2">
-                          <button onClick={() => { setIsMenuOpen(false); navigate(`/brand/${brand.slug}`); }} className="flex flex-col text-left">
+                          <button onClick={() => navigateToBrand(brand)} className="flex flex-col text-left">
                             <span className="text-base font-bold text-[#1A1A1A] group-hover:text-[#997B4D] transition-colors">{brand.eng}</span>
                             <span className="text-xs text-gray-500 mt-1">{brand.kor}</span>
                           </button>

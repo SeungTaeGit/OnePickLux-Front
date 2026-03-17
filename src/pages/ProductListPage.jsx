@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Filter, SlidersHorizontal, ChevronDown, ChevronRight, Search, Tag, Sparkles, Flame } from 'lucide-react';
+import { Filter, SlidersHorizontal, ChevronDown, ChevronRight, Search, Tag, Sparkles, Flame, CheckSquare } from 'lucide-react';
 import axios from 'axios';
 import ProductCard from '../components/common/ProductCard.jsx';
 import { getProducts } from '../api/productApi.js';
@@ -23,6 +23,10 @@ const ProductListPage = () => {
   const urlFilter = queryParams.get('filter');
   const urlCategoryId = queryParams.get('categoryId');
   const urlBrandId = queryParams.get('brandId');
+  const urlKeyword = queryParams.get('keyword');
+
+  const defaultType = urlKeyword ? 'all' : 'PRE_OWNED';
+  const urlType = queryParams.get('type');
 
   let initialTab = 'new';
   if (urlFilter === 'sale') initialTab = 'sale';
@@ -30,28 +34,26 @@ const ProductListPage = () => {
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [filterPrice, setFilterPrice] = useState(10000000);
-  const [keyword, setKeyword] = useState('');
+  const [keyword, setKeyword] = useState(urlKeyword || '');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedCategory, setSelectedCategory] = useState(urlCategoryId ? Number(urlCategoryId) : 'all');
   const [selectedBrand, setSelectedBrand] = useState(urlBrandId ? Number(urlBrandId) : 'all');
+
+  const [selectedType, setSelectedType] = useState(urlType || defaultType);
   const [brands, setBrands] = useState([]);
 
-  // 💡 [핵심 수정] 관리자 API가 아닌 퍼블릭 API 호출 (토큰 불필요)
   useEffect(() => {
     const fetchBrands = async () => {
       try {
-        // admin 경로가 빠진 일반 고객용 API 주소!
         const response = await axios.get('http://localhost:8080/api/brands/active');
-
         let fetchedBrands = [];
         if (response.data && Array.isArray(response.data.data)) {
           fetchedBrands = response.data.data;
         } else if (Array.isArray(response.data)) {
           fetchedBrands = response.data;
         }
-
         setBrands(fetchedBrands);
       } catch (error) {
         console.error('🚨 브랜드 필터 로딩 중 오류 발생:', error);
@@ -72,18 +74,46 @@ const ProductListPage = () => {
     const brandId = currentParams.get('brandId');
     setSelectedBrand(brandId ? Number(brandId) : 'all');
 
+    const currentKeyword = currentParams.get('keyword');
+    setKeyword(currentKeyword || '');
+
+    const currentType = currentParams.get('type');
+    setSelectedType(currentType || (currentKeyword ? 'all' : 'PRE_OWNED'));
+
     setActiveTab(tab);
   }, [location.search]);
 
   const handleFilterChange = (key, value) => {
     const params = new URLSearchParams(location.search);
     if (value === 'all') {
-      params.delete(key);
+      // 💡 [핵심 수정] type은 기본값이 'PRE_OWNED'이므로, 'all'을 지우지 않고 명시적으로 URL에 남겨둡니다!
+      if (key === 'type') {
+        params.set(key, 'all');
+      } else {
+        params.delete(key);
+      }
     } else {
       params.set(key, value);
     }
     params.delete('page');
     navigate(`/products?${params.toString()}`);
+  };
+
+  const executeSearch = () => {
+    const params = new URLSearchParams(location.search);
+    if (keyword.trim()) {
+      params.set('keyword', keyword.trim());
+      // 💡 [UX 디테일] 검색어를 입력하면 무조건 '전체 보기'로 강제 고정하여 새상품/중고 모두 검색되게 합니다.
+      params.set('type', 'all');
+    } else {
+      params.delete('keyword');
+    }
+    params.delete('page');
+    navigate(`/products?${params.toString()}`);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') executeSearch();
   };
 
   const fetchProducts = async () => {
@@ -106,6 +136,8 @@ const ProductListPage = () => {
       if (selectedCategory !== 'all') params.categoryId = selectedCategory;
       if (selectedBrand !== 'all') params.brandId = selectedBrand;
 
+      if (selectedType !== 'all') params.type = selectedType;
+
       const response = await getProducts(params);
       if (response.data && response.data.content) {
           setProducts(response.data.content);
@@ -121,11 +153,7 @@ const ProductListPage = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, [activeTab, filterPrice, selectedCategory, selectedBrand]);
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') fetchProducts();
-  };
+  }, [activeTab, filterPrice, selectedCategory, selectedBrand, keyword, selectedType]);
 
   const tabs = [
     { id: 'new', label: 'NEW ARRIVALS', path: '/products?sort=new' },
@@ -214,7 +242,9 @@ const ProductListPage = () => {
           </div>
 
           <div className="mt-8 mb-8 w-full max-w-md relative group mx-auto">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#997B4D] transition-colors" size={20} />
+            <button onClick={executeSearch} className="absolute left-4 top-1/2 -translate-y-1/2 z-10 cursor-pointer">
+              <Search className="text-gray-400 group-focus-within:text-[#997B4D] hover:text-[#997B4D] transition-colors" size={20} />
+            </button>
             <input
               type="text"
               value={keyword}
@@ -233,7 +263,43 @@ const ProductListPage = () => {
         {/* ================= 좌측 사이드바 필터 ================= */}
         <aside className="w-full md:w-64 flex-shrink-0 space-y-8 hidden md:block">
 
-          {/* 1. 카테고리 필터 */}
+          {/* 1. 상품 유형(Type) 필터 */}
+          <div>
+            <h3 className="text-sm font-bold text-[#2C2C2C] mb-4 pb-2 border-b border-[#E5E0D8] flex items-center gap-2">
+              <CheckSquare size={14} /> CONDITION
+            </h3>
+            <ul className="space-y-3 text-sm text-[#5C5550]">
+              <li
+                className="flex items-center gap-3 cursor-pointer group"
+                onClick={() => handleFilterChange('type', 'all')}
+              >
+                <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${selectedType === 'all' ? 'bg-[#2C2C2C] border-[#2C2C2C]' : 'border-gray-300 group-hover:border-[#997B4D]'}`}>
+                    {selectedType === 'all' && <div className="w-1.5 h-1.5 bg-white rounded-sm"></div>}
+                </div>
+                <span className={selectedType === 'all' ? 'font-bold text-[#2C2C2C]' : ''}>전체 보기</span>
+              </li>
+              <li
+                className="flex items-center gap-3 cursor-pointer group"
+                onClick={() => handleFilterChange('type', 'PRE_OWNED')}
+              >
+                <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${selectedType === 'PRE_OWNED' ? 'bg-[#2C2C2C] border-[#2C2C2C]' : 'border-gray-300 group-hover:border-[#997B4D]'}`}>
+                    {selectedType === 'PRE_OWNED' && <div className="w-1.5 h-1.5 bg-white rounded-sm"></div>}
+                </div>
+                <span className={selectedType === 'PRE_OWNED' ? 'font-bold text-[#2C2C2C]' : ''}>중고 명품 (Pre-owned)</span>
+              </li>
+              <li
+                className="flex items-center gap-3 cursor-pointer group"
+                onClick={() => handleFilterChange('type', 'PARALLEL_IMPORT')}
+              >
+                <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${selectedType === 'PARALLEL_IMPORT' ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-gray-300 group-hover:border-[#D4AF37]'}`}>
+                    {selectedType === 'PARALLEL_IMPORT' && <div className="w-1.5 h-1.5 bg-white rounded-sm"></div>}
+                </div>
+                <span className={selectedType === 'PARALLEL_IMPORT' ? 'font-bold text-[#D4AF37]' : ''}>부띠끄 (새상품)</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 2. 카테고리 필터 */}
           <div>
             <h3 className="text-sm font-bold text-[#2C2C2C] mb-4 pb-2 border-b border-[#E5E0D8] flex items-center gap-2">
               <Filter size={14} /> CATEGORY
@@ -263,7 +329,7 @@ const ProductListPage = () => {
             </ul>
           </div>
 
-          {/* 2. 브랜드 필터 (퍼블릭 API 연동) */}
+          {/* 3. 브랜드 필터 (퍼블릭 API 연동) */}
           <div>
             <h3 className="text-sm font-bold text-[#2C2C2C] mb-4 pb-2 border-b border-[#E5E0D8]">BRAND</h3>
             <div className="h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 pr-2 space-y-2 text-sm text-[#5C5550]">
@@ -296,7 +362,7 @@ const ProductListPage = () => {
             </div>
           </div>
 
-          {/* 3. 가격 슬라이더 */}
+          {/* 4. 가격 슬라이더 */}
           <div>
             <h3 className="text-sm font-bold text-[#2C2C2C] mb-4 pb-2 border-b border-[#E5E0D8]">PRICE</h3>
             <input
@@ -346,7 +412,9 @@ const ProductListPage = () => {
                         brand: product.brandName,
                         name: product.name,
                         price: product.price,
-                        discountRate: product.discountRate
+                        discountRate: product.discountRate,
+                        type: product.type,
+                        typeDescription: product.typeDescription
                     }}
                 />
                 ))}

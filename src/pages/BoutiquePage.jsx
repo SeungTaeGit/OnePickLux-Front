@@ -14,7 +14,6 @@ const BoutiquePage = () => {
     try {
       setLoading(true);
       // 💡 [핵심] API 호출 시 type 파라미터에 'PARALLEL_IMPORT'를 실어서 보냅니다.
-      // 이렇게 하면 백엔드 Specification에서 새상품만 쏙 골라줍니다!
       const params = {
         page: 0,
         size: 40,
@@ -97,12 +96,9 @@ const BoutiquePage = () => {
         ) : products.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
               {products.map((product) => (
-              <div key={product.productId} className="relative">
-                {/* 💡 병행수입 새상품 전용 배지 추가 */}
-                <div className="absolute top-2 left-2 z-30 bg-[#1A1A1A] text-[#D4AF37] text-[9px] font-black px-2 py-1 tracking-widest uppercase border border-[#D4AF37]/30 shadow-md">
-                  NEW / 병행수입
-                </div>
+                // 💡 [수정] 겉을 감싸던 div와 수동 배지 코드를 싹 지우고 오직 ProductCard만 호출합니다!
                 <ProductCard
+                    key={product.productId}
                     product={{
                         ...product,
                         image: product.thumbnailUrl || "IMG",
@@ -112,7 +108,6 @@ const BoutiquePage = () => {
                         discountRate: product.discountRate
                     }}
                 />
-              </div>
               ))}
           </div>
         ) : (

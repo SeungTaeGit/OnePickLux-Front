@@ -11,15 +11,16 @@ const ProductCard = ({ product }) => {
   const [isHovered, setIsHovered] = useState(false);
   const timerRef = useRef(null);
 
-  // 💡 [핵심] 판매 완료 상태인지 확인합니다. (백엔드에서 '판매완료' 또는 'SOLD_OUT'으로 올 수 있음)
   const isSoldOut = product.status === '판매완료' || product.status === 'SOLD_OUT' || product.status === '품절';
+
+  // 💡 [핵심 추가] 이 상품이 병행수입 새상품인지 확인하는 변수
+  const isBoutique = product.type === 'PARALLEL_IMPORT' || product.typeDescription === '병행수입(새상품)';
 
   const discountRate = product.discountRate || product.discount || 0;
   const finalPrice = discountRate > 0
     ? Math.floor(product.price * (1 - discountRate / 100))
     : product.price;
 
-  // 💡 '샤넬 (Chanel)' 형태의 문자열에서 괄호 안의 영문(Chanel)만 추출하여 로고처럼 사용합니다.
   const extractBrandLogoText = (fullName) => {
     if (!fullName) return 'BRAND';
     const match = fullName.match(/\(([^)]+)\)/);
@@ -49,7 +50,7 @@ const ProductCard = ({ product }) => {
   const getImageUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    const S3_BASE_URL = 'https://onepick-lux-images.s3.ap-northeast-2.amazonaws.com';
+    const S3_BASE_URL = import.meta.env.VITE_S3_BASE_URL || 'https://onepick-lux-images.s3.ap-northeast-2.amazonaws.com';
     return `${S3_BASE_URL}/${path.startsWith('/') ? path.slice(1) : path}`;
   };
 
@@ -58,10 +59,8 @@ const ProductCard = ({ product }) => {
   const displayImages = [mainImg, ...extraImages].filter(Boolean);
 
   useEffect(() => {
-    // 판매완료 상품은 호버 시 이미지가 바뀌지 않도록 처리하여 정적인 느낌을 줍니다.
     if (isHovered && displayImages.length > 1 && !isSoldOut) {
       setCurrentImageIndex(1);
-
       timerRef.current = setInterval(() => {
         setCurrentImageIndex((prevIndex) => (prevIndex + 1) % displayImages.length);
       }, 2000);
@@ -69,20 +68,32 @@ const ProductCard = ({ product }) => {
       clearInterval(timerRef.current);
       setCurrentImageIndex(0);
     }
-
     return () => clearInterval(timerRef.current);
   }, [isHovered, displayImages.length, isSoldOut]);
 
   return (
     <div
       className="group cursor-pointer"
-      onClick={() => navigate(`/products/${product.productId}`)}
+      onClick={() => navigate(`/products/${product.productId || product.id}`)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="relative aspect-[3/4] bg-[#F4F4F4] overflow-hidden mb-4 border border-[#E5E0D8]">
 
-        {/* 1. 상품 이미지 렌더링 */}
+        {/* 💡 1. 부띠끄(새상품) 글로벌 배지 추가! 이제 어디서든 이 카드를 쓰면 배지가 보입니다. */}
+        {isBoutique && !isSoldOut && (
+          <div className="absolute top-0 left-0 bg-[#1A1A1A] text-[#D4AF37] text-[9px] font-black px-3 py-1.5 tracking-widest uppercase z-30 shadow-md">
+            BOUTIQUE / 새상품
+          </div>
+        )}
+
+        {/* 기존 할인 배지 위치 조정 (부띠끄 배지와 안 겹치도록) */}
+        {!isSoldOut && discountRate > 0 && (
+          <div className={`absolute left-0 bg-[#997B4D] text-white text-[10px] font-bold px-3 py-1.5 tracking-wider z-20 shadow-md ${isBoutique ? 'top-6' : 'top-0'}`}>
+            -{discountRate}%
+          </div>
+        )}
+
         {displayImages.length > 0 && displayImages[0] !== "IMG" ? (
           displayImages.map((imgUrl, index) => (
             <img
@@ -91,37 +102,25 @@ const ProductCard = ({ product }) => {
               alt={`${product.name} 이미지 ${index}`}
               className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-in-out ${!isSoldOut && 'group-hover:scale-105'} ${
                 index === currentImageIndex ? 'opacity-100' : 'opacity-0'
-              } ${isSoldOut ? 'grayscale-[30%]' : ''}`} // 판매완료 시 살짝 흑백 처리
+              } ${isSoldOut ? 'grayscale-[30%]' : ''}`}
             />
           ))
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-[#CCC] font-serif tracking-widest transition">IMAGE</div>
         )}
 
-        {/* 💡 2. 판매완료 오버레이 (Dim 처리 및 브랜드 텍스트 로고) */}
         {isSoldOut && (
-          <div className="absolute inset-0 bg-black/50 z-20 flex flex-col items-center justify-center p-4 backdrop-blur-[2px]">
-             {/* 브랜드 영문 텍스트를 로고처럼 렌더링 */}
+          <div className="absolute inset-0 bg-black/50 z-40 flex flex-col items-center justify-center p-4 backdrop-blur-[2px]">
              <span className="text-white font-serif text-2xl tracking-[0.25em] uppercase text-center mb-3 drop-shadow-md">
                {brandLogoText}
              </span>
-             {/* 디바이더 선 */}
              <div className="w-12 h-[1px] bg-white/60 mb-3"></div>
-             {/* SOLD OUT 텍스트 */}
              <span className="text-white text-xs font-black tracking-[0.3em] uppercase drop-shadow-md">
                SOLD OUT
              </span>
           </div>
         )}
 
-        {/* 3. 할인율 뱃지 (판매완료가 아닐 때만 노출) */}
-        {!isSoldOut && discountRate > 0 && (
-          <div className="absolute top-0 left-0 bg-[#997B4D] text-white text-[10px] font-bold px-3 py-1.5 tracking-wider z-10">
-            -{discountRate}%
-          </div>
-        )}
-
-        {/* 4. 좋아요 버튼 (판매완료여도 찜은 할 수 있도록 유지하거나, 원하시면 막을 수 있습니다) */}
         <button
           onClick={handleLikeToggle}
           className="absolute top-3 right-3 z-30 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white shadow-sm transition-all"
@@ -132,10 +131,9 @@ const ProductCard = ({ product }) => {
           />
         </button>
 
-        {/* 5. 퀵뷰 버튼 (판매완료 시 노출 안 함) */}
         {!isSoldOut && (
           <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-gradient-to-t from-black/50 to-transparent z-10">
-            <button className="w-full py-3 bg-white text-[#2C2C2C] text-xs font-bold tracking-widest hover:bg-[#2C2C2C] hover:text-white transition">QUICK VIEW</button>
+            <button className="w-full py-3 bg-white text-[#2C2C2C] text-xs font-bold tracking-widest hover:bg-[#2C2C2C] hover:text-white transition shadow-lg">QUICK VIEW</button>
           </div>
         )}
       </div>
@@ -148,12 +146,9 @@ const ProductCard = ({ product }) => {
           {product.name}
         </p>
 
-        {/* 💡 6. 가격 영역: 판매완료 시 가격 숨김 및 텍스트 대체 */}
         <div className="flex items-center justify-center gap-2 font-serif text-[#2C2C2C] h-6">
           {isSoldOut ? (
-            <span className="text-xs font-black text-[#888] tracking-widest uppercase bg-gray-100 px-3 py-1 rounded-sm">
-              판매 완료
-            </span>
+            <span className="text-[10px] font-black text-[#888] tracking-widest uppercase bg-gray-100 px-3 py-1 rounded-sm">판매 완료</span>
           ) : discountRate > 0 ? (
             <>
               <span className="text-base font-bold text-red-500">{finalPrice.toLocaleString()}원</span>
