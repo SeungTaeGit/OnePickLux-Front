@@ -1,55 +1,66 @@
 import React, { useState, useEffect } from 'react';
-import { User, Package, Tag, Heart, ChevronRight } from 'lucide-react';
+import { User, Package, Tag, Heart, ChevronRight, MessageSquare, AlertCircle } from 'lucide-react'; // 💡 MessageSquare, AlertCircle 추가
 import { getMyProfile, getMySellingHistory, getMyOrderHistory, getMyLikedProducts } from '../api/myPageApi.js';
 import { useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios'; // 💡 문의 내역 직접 호출용
 import ProductCard from '../components/common/ProductCard.jsx';
 
 const MyPage = () => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocation(); // 💡 다른 페이지에서 탭을 지정해서 넘어올 때 사용
+
+  // URL state로 activeTab이 넘어오면 그걸 쓰고, 아니면 'profile' 사용
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'profile');
 
   const [profile, setProfile] = useState(null);
   const [sellingList, setSellingList] = useState([]);
   const [orderList, setOrderList] = useState([]);
   const [likedList, setLikedList] = useState([]);
+
+  // 💡 [추가] 1:1 문의 내역 상태
+  const [inquiryList, setInquiryList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 💡 [추가] 내가 쓴 1:1 문의 내역을 불러오는 함수
+  const fetchMyInquiries = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return [];
+      const response = await axios.get('http://localhost:8080/api/inquiries/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data?.data || [];
+    } catch (error) {
+      console.error('문의 내역 로드 실패:', error);
+      return [];
+    }
+  };
 
   useEffect(() => {
     const fetchMyPageData = async () => {
       try {
         setIsLoading(true);
-        console.log("🔄 마이페이지 데이터 로딩 시작...");
 
-        // 💡 4개의 API를 병렬 호출하며, 하나라도 에러가 나면 앱이 멈추지 않도록 각각 catch를 달아줍니다.
-        const [profileRes, sellingRes, orderRes, likedRes] = await Promise.all([
+        // 💡 문의 내역 API도 함께 호출합니다.
+        const [profileRes, sellingRes, orderRes, likedRes, inquiryRes] = await Promise.all([
           getMyProfile().catch(e => { console.error("프로필 에러:", e); return null; }),
           getMySellingHistory().catch(e => { console.error("판매내역 에러:", e); return null; }),
           getMyOrderHistory().catch(e => { console.error("구매내역 에러:", e); return null; }),
-          getMyLikedProducts().catch(e => {
-            console.error("🚨 찜한 상품 API 에러:", e);
-            return { status: 'ERROR', data: [] };
-          })
+          getMyLikedProducts().catch(e => { return { status: 'ERROR', data: [] }; }),
+          fetchMyInquiries() // 💡 문의 내역 함수 추가
         ]);
 
         if (profileRes && profileRes.status === 'OK') setProfile(profileRes.data);
         if (sellingRes && sellingRes.status === 'OK') setSellingList(sellingRes.data);
         if (orderRes && orderRes.status === 'OK') setOrderList(orderRes.data);
+        if (inquiryRes) setInquiryList(inquiryRes);
 
-        // 💡 Axios 래핑을 벗겨내는 강력한 방어 로직
-        console.log("📦 찜한 상품 백엔드 응답 데이터:", likedRes);
         let likesArray = [];
         if (likedRes) {
-          if (likedRes.data && Array.isArray(likedRes.data)) {
-            likesArray = likedRes.data;
-          } else if (likedRes.data?.data && Array.isArray(likedRes.data.data)) {
-            likesArray = likedRes.data.data;
-          } else if (Array.isArray(likedRes)) {
-            likesArray = likedRes;
-          }
+          if (likedRes.data && Array.isArray(likedRes.data)) likesArray = likedRes.data;
+          else if (likedRes.data?.data && Array.isArray(likedRes.data.data)) likesArray = likedRes.data.data;
+          else if (Array.isArray(likedRes)) likesArray = likedRes;
         }
-
-        console.log("🎯 최종 렌더링될 찜 상품 개수:", likesArray.length);
         setLikedList(likesArray);
 
       } catch (error) {
@@ -108,15 +119,26 @@ const MyPage = () => {
             </button>
             <button
               onClick={() => setActiveTab('likes')}
-              className={`w-full flex items-center justify-between p-5 text-sm font-bold tracking-widest transition ${activeTab === 'likes' ? 'bg-[#FDFBF7] text-[#997B4D]' : 'text-[#5C5550] hover:bg-gray-50'}`}
+              className={`w-full flex items-center justify-between p-5 text-sm font-bold tracking-widest transition border-b border-[#E5E0D8] ${activeTab === 'likes' ? 'bg-[#FDFBF7] text-[#997B4D]' : 'text-[#5C5550] hover:bg-gray-50'}`}
             >
               <div className="flex items-center gap-3"><Heart size={16} /> 찜한 상품 <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{likedList.length}</span></div>
+              <ChevronRight size={14} />
+            </button>
+
+            {/* 💡 [추가] 1:1 문의 내역 탭 */}
+            <button
+              onClick={() => setActiveTab('inquiries')}
+              className={`w-full flex items-center justify-between p-5 text-sm font-bold tracking-widest transition ${activeTab === 'inquiries' ? 'bg-[#FDFBF7] text-[#997B4D]' : 'text-[#5C5550] hover:bg-gray-50'}`}
+            >
+              <div className="flex items-center gap-3"><MessageSquare size={16} /> 1:1 문의 내역 <span className="bg-[#1A1A1A] text-white text-[10px] px-2 py-0.5 rounded-full">{inquiryList.length}</span></div>
               <ChevronRight size={14} />
             </button>
           </div>
         </aside>
 
         <main className="flex-1 bg-white border border-[#E5E0D8] shadow-sm p-8 md:p-12 min-h-[500px]">
+
+          {/* 내 정보 탭 */}
           {activeTab === 'profile' && (
             <div className="animate-fade-in">
               <h3 className="text-xl font-serif text-[#2C2C2C] mb-6 pb-4 border-b border-[#E5E0D8]">Profile Information</h3>
@@ -130,6 +152,7 @@ const MyPage = () => {
             </div>
           )}
 
+          {/* 판매 내역 탭 */}
           {activeTab === 'selling' && (
             <div className="animate-fade-in">
               <h3 className="text-xl font-serif text-[#2C2C2C] mb-6 pb-4 border-b border-[#E5E0D8]">Selling History</h3>
@@ -162,6 +185,7 @@ const MyPage = () => {
             </div>
           )}
 
+          {/* 구매 내역 탭 */}
           {activeTab === 'orders' && (
             <div className="animate-fade-in">
               <h3 className="text-xl font-serif text-[#2C2C2C] mb-6 pb-4 border-b border-[#E5E0D8]">Order History</h3>
@@ -175,6 +199,7 @@ const MyPage = () => {
             </div>
           )}
 
+          {/* 찜한 상품 탭 */}
           {activeTab === 'likes' && (
             <div className="animate-fade-in">
               <h3 className="text-xl font-serif text-[#2C2C2C] mb-6 pb-4 border-b border-[#E5E0D8] flex items-center justify-between">
@@ -208,6 +233,68 @@ const MyPage = () => {
               )}
             </div>
           )}
+
+          {/* 💡 [추가] 1:1 문의 내역 탭 */}
+          {activeTab === 'inquiries' && (
+            <div className="animate-fade-in">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#E5E0D8]">
+                <h3 className="text-xl font-serif text-[#2C2C2C]">1:1 Inquiries</h3>
+                <button onClick={() => navigate('/cs')} className="text-xs font-bold text-[#997B4D] border border-[#997B4D] px-4 py-2 hover:bg-[#997B4D] hover:text-white transition rounded-sm">새 문의 작성</button>
+              </div>
+
+              {inquiryList.length === 0 ? (
+                <div className="text-center py-20 text-[#888] bg-[#FDFBF7] border border-[#E5E0D8] flex flex-col items-center justify-center">
+                  <MessageSquare size={40} className="text-[#E5E0D8] mb-4" strokeWidth={1.5} />
+                  <p className="font-bold text-[#5C5550] mb-2">작성한 1:1 문의가 없습니다.</p>
+                  <p className="text-sm">궁금한 점이 있으시다면 언제든 고객센터를 이용해주세요.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {inquiryList.map((inquiry) => (
+                    <div key={inquiry.inquiryId} className="border border-[#E5E0D8] rounded-sm overflow-hidden bg-white">
+                      {/* 질문 영역 (고객이 쓴 내용) */}
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] bg-[#F4F4F4] text-[#5C5550] border border-[#E5E0D8] px-2 py-1 uppercase tracking-widest font-bold">
+                              {inquiry.typeDescription}
+                            </span>
+                            <span className={`text-[10px] font-black px-2 py-1 uppercase tracking-widest ${
+                              inquiry.status === 'ANSWERED' ? 'bg-[#1A1A1A] text-[#D4AF37]' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {inquiry.statusDescription}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-400 font-mono">{inquiry.createdAt?.split('T')[0]}</span>
+                        </div>
+                        <h4 className="font-bold text-[#2C2C2C] mb-2 text-lg">{inquiry.title}</h4>
+                        <p className="text-sm text-[#5C5550] leading-relaxed whitespace-pre-wrap">{inquiry.content}</p>
+                      </div>
+
+                      {/* 💡 답변 영역 (관리자가 답변을 달았을 때만 보임) */}
+                      {inquiry.status === 'ANSWERED' && (
+                        <div className="bg-[#FDFBF7] p-6 border-t border-[#E5E0D8] flex gap-4">
+                           <div className="w-8 h-8 rounded-full bg-[#D4AF37] flex items-center justify-center shrink-0">
+                             <AlertCircle size={16} className="text-white" />
+                           </div>
+                           <div>
+                             <div className="flex items-center gap-2 mb-2">
+                               <span className="font-bold text-[#997B4D] text-sm">ONEPICK LUX 고객센터</span>
+                               <span className="text-xs text-gray-400 font-mono">{inquiry.answeredAt?.split('T')[0]}</span>
+                             </div>
+                             <p className="text-sm text-[#2C2C2C] leading-relaxed whitespace-pre-wrap font-medium">
+                               {inquiry.answerContent}
+                             </p>
+                           </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
         </main>
       </div>
     </div>

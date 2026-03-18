@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Package, Tag, Image as ImageIcon, PlusCircle } from 'lucide-react';
+import { LayoutDashboard, Package, Tag, Image as ImageIcon, PlusCircle, MessageSquare } from 'lucide-react'; // 💡 MessageSquare 아이콘 추가
 import { Tag as TagIcon } from 'lucide-react';
 
 import AdminDashboard from './AdminDashboard';
@@ -8,6 +8,7 @@ import AdminProductCreate from './AdminProductCreate';
 import AdminRequests from './AdminRequests';
 import AdminBanners from './AdminBanners';
 import AdminBrands from './AdminBrands';
+import AdminInquiries from './AdminInquiries'; // 💡 새로 만든 컴포넌트 임포트
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -28,6 +29,7 @@ const AdminPage = () => {
             { id: 'product-create', icon: PlusCircle, label: 'Product Create' },
             { id: 'brands', icon: TagIcon, label: 'Brand Config' },
             { id: 'requests', icon: Tag, label: 'Selling Requests' },
+            { id: 'inquiries', icon: MessageSquare, label: 'CS Inquiries' }, // 💡 고객센터(문의 관리) 메뉴 추가
             { id: 'banners', icon: ImageIcon, label: 'Banner Management' }
           ].map(item => (
             <button
@@ -62,6 +64,7 @@ const AdminPage = () => {
         {activeTab === 'product-create' && <AdminProductCreate />}
         {activeTab === 'brands' && <AdminBrands />}
         {activeTab === 'requests' && <AdminRequests />}
+        {activeTab === 'inquiries' && <AdminInquiries />}
         {activeTab === 'banners' && <AdminBanners />}
       </main>
     </div>

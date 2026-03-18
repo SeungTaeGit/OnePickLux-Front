@@ -15,6 +15,7 @@ import CartPage from './pages/CartPage';
 import FloatingQuickMenu from './components/layout/FloatingQuickMenu';
 import BrandPage from './pages/BrandPage';
 import BoutiquePage from './pages/BoutiquePage.jsx';
+import CustomerCenterPage from './pages/CustomerCenterPage.jsx';
 
 const App = () => {
   return (
@@ -36,6 +37,7 @@ const App = () => {
             <Route path="/cart" element={<CartPage />} />
             <Route path="/brand/:brandName" element={<BrandPage />} />
             <Route path="/boutique" element={<BoutiquePage />} />
+            <Route path="/cs" element={<CustomerCenterPage />} />
           </Routes>
         </main>
         <Footer />
