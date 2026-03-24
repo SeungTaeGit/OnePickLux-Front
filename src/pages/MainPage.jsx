@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import BannerSection from '../components/home/BannerSection.jsx';
+import Hero3DShowcase from '../components/home/Hero3DShowcase.jsx'; // 💡 신규 3D 히어로 배너 임포트
+import BannerSection from '../components/home/BannerSection.jsx'; // 💡 승태님의 기존 동적 롤링 배너
 import ProductCard from '../components/common/ProductCard.jsx';
 import { getProducts } from '../api/productApi.js';
 import axios from 'axios';
@@ -17,14 +18,10 @@ const MainPage = () => {
   const [rolexProducts, setRolexProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 💡 [수정] DB에서 불러온 실제 활성 브랜드들을 담을 상태
   const [activeBrands, setActiveBrands] = useState([]);
-
-  // 💡 브랜드 포커스(샤넬, 롤렉스) 섹션을 위한 실제 브랜드 정보 상태
   const [chanelBrandInfo, setChanelBrandInfo] = useState(null);
   const [rolexBrandInfo, setRolexBrandInfo] = useState(null);
 
-  // S3 이미지 URL 변환 헬퍼
   const getImageUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
@@ -39,10 +36,8 @@ const MainPage = () => {
         const brandRes = await axios.get('http://localhost:8080/api/brands/active');
         const allBrands = brandRes.data?.data || brandRes.data || [];
 
-        // 💡 1. 가져온 브랜드 전체를 상태에 저장합니다 (상단 동그란 로고용)
         setActiveBrands(allBrands);
 
-        // 💡 2. 샤넬과 롤렉스의 실제 DB 정보를 찾습니다.
         const chanel = allBrands.find(b => b.englishName?.toUpperCase() === 'CHANEL');
         const rolex = allBrands.find(b => b.englishName?.toUpperCase() === 'ROLEX');
 
@@ -95,7 +90,6 @@ const MainPage = () => {
     ));
   };
 
-  // 💡 [핵심] 안전하게 브랜드관으로 이동시키는 공통 함수
   const navigateToBrand = (brand) => {
     if (!brand) return;
     const slug = brand.englishName.toLowerCase().replace(/\s+/g, '-');
@@ -105,13 +99,16 @@ const MainPage = () => {
   };
 
   return (
-    <div className="animate-fade-in font-sans pb-20 bg-white">
+    <div className="animate-fade-in font-sans pb-20 bg-white flex flex-col">
 
-      {/* 1. 최상단 배너 섹션 */}
+      {/* 💡 1. [압도적 UX] 최상단 3D 히어로 쇼케이스 */}
+      <Hero3DShowcase />
+
+      {/* 💡 2. [마케팅/프로모션] 승태님이 만든 동적 롤링 배너 */}
       <BannerSection />
 
-      {/* 💡 2. [완전 개편] DB에서 관리자가 올린 로고를 둥글게 뿌려줍니다! */}
-      <section className="py-12 border-b border-[#E5E0D8] bg-white">
+      {/* 3. Shop by Brand */}
+      <section className="py-12 border-b border-[#E5E0D8] bg-white mt-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-center text-xs font-black tracking-[0.3em] text-gray-400 mb-8 uppercase">Shop by Brand</h2>
 
@@ -126,7 +123,6 @@ const MainPage = () => {
                 >
                   <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border border-[#E5E0D8] overflow-hidden p-[2px] group-hover:border-[#997B4D] transition-colors bg-white shadow-sm flex items-center justify-center">
                     {brand.logoUrl ? (
-                      // 💡 관리자가 올린 로고가 배경 없이 깔끔하게 나오도록 mix-blend-multiply 적용
                       <img src={getImageUrl(brand.logoUrl)} alt={brand.englishName} className="w-full h-full object-contain p-2 mix-blend-multiply group-hover:scale-110 transition-all duration-500" />
                     ) : (
                       <span className="text-[8px] font-bold text-gray-400">NO LOGO</span>
@@ -139,12 +135,11 @@ const MainPage = () => {
               );
             })}
           </div>
-          {/* '모든 브랜드 보기' 버튼은 요청하신 대로 깔끔하게 삭제되었습니다. */}
         </div>
       </section>
 
-      {/* 3. BOUTIQUE (새상품) 프리뷰 섹션 */}
-      <section className="bg-[#1A1A1A] py-24 border-y-[6px] border-[#D4AF37]">
+      {/* 4. BOUTIQUE (새상품) 프리뷰 섹션 */}
+      <section className="bg-[#1A1A1A] py-24 border-b-4 border-[#D4AF37]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center mb-16 text-center">
             <span className="flex items-center gap-2 text-[#D4AF37] text-[10px] font-black tracking-[0.4em] mb-4 uppercase">
@@ -176,7 +171,7 @@ const MainPage = () => {
         </div>
       </section>
 
-      {/* 4. PRE-OWNED 신상품 섹션 */}
+      {/* 5. PRE-OWNED 신상품 섹션 */}
       <section className="py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-[#E5E0D8]">
         <div className="flex flex-col items-center mb-12">
           <span className="flex items-center gap-2 text-[#997B4D] text-[10px] font-black tracking-[0.3em] mb-3 uppercase">
@@ -197,7 +192,7 @@ const MainPage = () => {
         )}
       </section>
 
-      {/* 5. 대표 브랜드 섹션 (버그 완벽 차단) */}
+      {/* 6. 대표 브랜드 섹션 */}
       <section className="bg-[#FDFBF7] py-24 border-b border-[#E5E0D8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -207,7 +202,6 @@ const MainPage = () => {
           </div>
 
           <div className="flex flex-col lg:flex-row gap-8 mb-24">
-            {/* 💡 샤넬 배너 클릭 시 진짜 ID 전달! */}
             <div
               onClick={() => chanelBrandInfo ? navigateToBrand(chanelBrandInfo) : navigate('/brand/chanel')}
               className="lg:w-1/3 relative aspect-[3/4] overflow-hidden group cursor-pointer bg-[#1A1A1A] flex items-center justify-center"
@@ -227,7 +221,6 @@ const MainPage = () => {
           </div>
 
           <div className="flex flex-col lg:flex-row-reverse gap-8">
-            {/* 💡 롤렉스 배너 클릭 시 진짜 ID 전달! */}
             <div
               onClick={() => rolexBrandInfo ? navigateToBrand(rolexBrandInfo) : navigate('/brand/rolex')}
               className="lg:w-1/3 relative aspect-[3/4] overflow-hidden group cursor-pointer bg-[#006039] flex items-center justify-center"
@@ -248,7 +241,7 @@ const MainPage = () => {
         </div>
       </section>
 
-      {/* 6. 베스트 상품 섹션 */}
+      {/* 7. 베스트 상품 섹션 */}
       <section className="py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center mb-12">
           <span className="flex items-center gap-2 text-[#997B4D] text-[10px] font-black tracking-[0.3em] mb-3 uppercase">
@@ -269,7 +262,7 @@ const MainPage = () => {
         )}
       </section>
 
-      {/* 7. 미드 배너 */}
+      {/* 8. 미드 배너 */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-24">
         <div className="bg-[#2C2C2C] rounded-sm p-10 md:p-14 text-white relative overflow-hidden shadow-2xl flex flex-col items-center text-center justify-center">
           <div className="relative z-10 max-w-2xl">
@@ -283,7 +276,7 @@ const MainPage = () => {
         </div>
       </section>
 
-      {/* 8. 특가 세일 섹션 */}
+      {/* 9. 특가 세일 섹션 */}
       <section className="bg-[#F8F9FA] py-24 border-t border-[#E5E0D8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center mb-12">
